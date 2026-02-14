@@ -72,14 +72,40 @@
             box-shadow: 0 20px 40px rgba(0, 102, 255, 0.1);
         }
 
+        /* FIX: Code Container dengan Scroll Bar */
         .code-container {
             background: #0F172A;
             color: #94A3B8;
             border-radius: 1rem;
             padding: 1.5rem;
-            font-family: 'Consolas', monospace;
+            font-family: 'Consolas', 'Monaco', monospace;
             font-size: 13px;
-            overflow-x: auto;
+            max-height: 500px; /* Batasi tinggi kotak kode */
+            overflow: auto;    /* Aktifkan scroll bar jika konten melampaui batas */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+
+        /* Custom Scrollbar untuk kotak kode agar lebih estetik */
+        .code-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .code-container::-webkit-scrollbar-track {
+            background: #0F172A;
+            border-radius: 10px;
+        }
+        .code-container::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+        .code-container::-webkit-scrollbar-thumb:hover {
+            background: #0066FF;
+        }
+
+        pre {
+            margin: 0;
+            white-space: pre; /* Menjaga format kode Python */
         }
     </style>
 </head>
@@ -101,7 +127,7 @@
                 <a href="#source-code" class="hover:text-game-blue transition">Source Code</a>
             </div>
             <a href="#source-code" class="bg-game-dark text-white text-xs font-bold py-2.5 px-6 rounded-full hover:shadow-xl hover:shadow-blue-500/20 transition uppercase tracking-widest">
-                Download Script
+                Get Script
             </a>
         </div>
     </nav>
@@ -116,7 +142,7 @@
                 Jadikan Tanganmu <br> <span class="text-transparent bg-clip-text bg-gradient-to-r from-game-blue to-game-cyan">Pedang Cahaya.</span>
             </h1>
             <p class="text-xl text-slate-500 mb-10 leading-relaxed max-w-2xl mx-auto font-medium">
-                Rasakan sensasi menebas buah virtual di layar tanpa menyentuh apa pun. Cukup gunakan webcam dan biarkan AI kami bekerja.
+                Rasakan sensasi menebas buah virtual di layar tanpa menyentuh apa pun. Cukup gunakan webcam dan biarkan AI kami bekerja secara ajaib.
             </p>
             <div class="flex justify-center gap-4">
                 <a href="#source-code" class="bg-game-blue hover:bg-game-dark text-white font-extrabold py-4 px-10 rounded-2xl transition shadow-2xl shadow-blue-500/40 flex items-center gap-3">
@@ -149,7 +175,7 @@
                     <div class="carousel-slide relative">
                         <img src="asset/result.png" alt="Final Score Preview">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-12 text-white">
-                            <div><h3 class="text-2xl font-black">LOCAL MULTIPLAYER</h3><p class="opacity-80">Bertanding skor dengan teman di sisi layar yang berbeda.</p></div>
+                            <div><h3 class="text-2xl font-black">LOCAL MULTIPLAYER</h3><p class="opacity-80">Bertanding skor dengan teman secara real-time.</p></div>
                         </div>
                     </div>
                 </div>
@@ -162,44 +188,43 @@
                     <i class="fas fa-chevron-left"></i>
                 </button>
             </div>
-            
             <p class="text-center mt-8 text-sm text-slate-400 font-bold uppercase tracking-widest italic">
-                <i class="fas fa-info-circle mr-2"></i> Klik panah untuk melihat tangkapan layar game
+                <i class="fas fa-info-circle mr-2"></i> Gunakan tombol panah untuk melihat gallery
             </p>
         </div>
     </section>
 
-    <!-- HOW TO PLAY (BENTO GRID) -->
+    <!-- HOW TO PLAY -->
     <section id="how-to-play" class="py-24 bg-slate-50">
         <div class="max-w-7xl mx-auto px-6">
             <div class="text-center mb-16" data-aos="fade-up">
                 <h2 class="text-4xl font-black text-game-dark tracking-tighter">Hanya Butuh Tanganmu.</h2>
-                <p class="text-slate-500 mt-4">Tanpa kontroler, tanpa kabel, murni teknologi AI.</p>
+                <p class="text-slate-500 mt-4 font-medium">Tanpa kontroler, tanpa kabel, murni teknologi AI Vision.</p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="bento-card p-10 rounded-3xl" data-aos="fade-up" data-aos-delay="100">
-                    <div class="w-14 h-14 bg-blue-100 text-game-blue rounded-2xl flex items-center justify-center mb-6 text-2xl">
+                    <div class="w-14 h-14 bg-blue-100 text-game-blue rounded-2xl flex items-center justify-center mb-6 text-2xl shadow-inner">
                         <i class="fas fa-hand-scissors"></i>
                     </div>
                     <h3 class="text-2xl font-black text-game-dark mb-4 tracking-tighter">AI Vision Tracking</h3>
                     <p class="text-slate-500 leading-relaxed text-sm">Mendeteksi 21 titik koordinat tangan secara instan untuk presisi tebasan tingkat milimeter.</p>
                 </div>
 
-                <div class="bento-card p-10 rounded-3xl border-game-blue/20 bg-gradient-to-br from-white to-blue-50/50" data-aos="fade-up" data-aos-delay="200">
-                    <div class="w-14 h-14 bg-game-dark text-white rounded-2xl flex items-center justify-center mb-6 text-2xl">
-                        <i class="fas fa-fire"></i>
+                <div class="bento-card p-10 rounded-3xl border-game-blue/20 bg-gradient-to-br from-white to-blue-50/50 shadow-xl shadow-blue-500/5" data-aos="fade-up" data-aos-delay="200">
+                    <div class="w-14 h-14 bg-game-dark text-white rounded-2xl flex items-center justify-center mb-6 text-2xl shadow-lg shadow-black/20">
+                        <i class="fas fa-bolt"></i>
                     </div>
-                    <h3 class="text-2xl font-black text-game-dark mb-4 tracking-tighter">Combo System</h3>
-                    <p class="text-slate-500 leading-relaxed text-sm">Tebas beberapa buah sekaligus dalam satu gerakan untuk mendapatkan skor AETHER x10!</p>
+                    <h3 class="text-2xl font-black text-game-dark mb-4 tracking-tighter">Zero Latency</h3>
+                    <p class="text-slate-500 leading-relaxed text-sm">Optimasi frame pipeline memastikan respon pedang selaras dengan gerakan tangan tanpa delay sedikitpun.</p>
                 </div>
 
                 <div class="bento-card p-10 rounded-3xl" data-aos="fade-up" data-aos-delay="300">
-                    <div class="w-14 h-14 bg-orange-100 text-game-amber rounded-2xl flex items-center justify-center mb-6 text-2xl">
+                    <div class="w-14 h-14 bg-orange-100 text-game-amber rounded-2xl flex items-center justify-center mb-6 text-2xl shadow-inner">
                         <i class="fas fa-bomb"></i>
                     </div>
                     <h3 class="text-2xl font-black text-game-dark mb-4 tracking-tighter">Avoid Bombs</h3>
-                    <p class="text-slate-500 leading-relaxed text-sm">Waspada dengan bom hitam! Satu tebakan yang salah akan mengguncang layar dan mengurangi poinmu.</p>
+                    <p class="text-slate-500 leading-relaxed text-sm">Waspada dengan bom hitam! Satu tebakan yang salah akan mengguncang layar dan menghancurkan skor Anda.</p>
                 </div>
             </div>
         </div>
@@ -211,28 +236,20 @@
             <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
                 <div class="text-left">
                     <h2 class="text-4xl font-black text-game-dark tracking-tighter">Instalasi & Script</h2>
-                    <p class="text-slate-500 mt-2">Salin kode ini dan jalankan di komputermu sendiri.</p>
+                    <p class="text-slate-500 mt-2">Dapatkan kode sumber penuh untuk dijalankan di perangkat Anda.</p>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="copyToClipboard('full-code')" class="bg-game-blue text-white text-xs font-bold px-8 py-4 rounded-xl hover:bg-game-dark transition shadow-lg flex items-center gap-2 uppercase tracking-widest">
+                    <button onclick="copyToClipboard('full-code')" class="bg-game-blue text-white text-xs font-bold px-8 py-4 rounded-xl hover:bg-game-dark transition shadow-lg shadow-blue-500/20 flex items-center gap-2 uppercase tracking-widest">
                         <i class="fas fa-copy"></i> Copy Script
                     </button>
+                    <a href="https://github.com/Indrawan1207/Game-AR" target="_blank" class="bg-slate-100 text-game-dark text-xs font-bold px-8 py-4 rounded-xl hover:bg-slate-200 transition flex items-center gap-2 uppercase tracking-widest">
+                        <i class="fab fa-github"></i> View Repo
+                    </a>
                 </div>
             </div>
 
-            <!-- Steps -->
-            <div class="grid md:grid-cols-2 gap-4 mb-8">
-                <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
-                    <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm font-bold text-game-blue">1</div>
-                    <p class="text-sm font-medium">Install: <code class="text-pink-600 bg-white px-2 py-1 rounded">pip install opencv-python mediapipe numpy</code></p>
-                </div>
-                <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
-                    <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm font-bold text-game-blue">2</div>
-                    <p class="text-sm font-medium">Buat file <code class="text-blue-600 bg-white px-2 py-1 rounded">main.py</code> dan tempel kode di bawah.</p>
-                </div>
-            </div>
-
-            <div class="code-container shadow-2xl">
+            <!-- CODE BOX WITH SCROLLBAR -->
+            <div class="code-container shadow-2xl" data-aos="fade-up">
 <pre id="full-code">
 import cv2
 import mediapipe as mp
@@ -742,17 +759,17 @@ if __name__ == "__main__":
                         </div>
                         <span class="font-black text-game-dark text-xl tracking-tighter">AETHERBLADES</span>
                     </div>
-                    <p class="text-slate-500 max-w-sm font-medium leading-relaxed">Satu Kamera, Tanpa Sensor, Rasakan Sensasi Menebas Cahaya.</p>
+                    <p class="text-slate-500 max-w-sm font-medium leading-relaxed italic">"Satu Kamera, Tanpa Sensor, Interaksi Real-Time Tanpa Batas."</p>
                 </div>
                 
                 <div class="flex flex-col items-center md:items-end">
-                    <p class="text-slate-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">Laboratory IA Studio</p>
-                    <div class="flex gap-6">
-                        <a href="https://wa.me/6285813877757" target="_blank" class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-game-blue hover:text-white transition">
-                            <i class="fab fa-whatsapp"></i>
-                        </a>
+                    <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-4">Laboratory IA Studio</p>
+                    <div class="flex gap-4">
                         <a href="https://github.com/Indrawan1207/Game-AR" target="_blank" class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-game-blue hover:text-white transition">
                             <i class="fab fa-github"></i>
+                        </a>
+                        <a href="https://wa.me/6285813877757" target="_blank" class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-green-500 hover:text-white transition">
+                            <i class="fab fa-whatsapp"></i>
                         </a>
                     </div>
                 </div>
@@ -769,7 +786,6 @@ if __name__ == "__main__":
     </footer>
 
     <!-- SCRIPTS -->
-    <script src="https://unpkg.com/aos@2.3.1/dist/aos.css"></script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
         AOS.init({ once: true, duration: 800 });
@@ -788,7 +804,7 @@ if __name__ == "__main__":
         function copyToClipboard(elementId) {
             const text = document.getElementById(elementId).innerText;
             navigator.clipboard.writeText(text).then(() => {
-                alert("Script berhasil disalin! Selamat coding!");
+                alert("Script berhasil disalin! Selamat mencoba Aether Blades.");
             });
         }
     </script>
