@@ -88,23 +88,77 @@
             box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
         }
 
-        /* Modern Code Box */
-        .code-box {
+        /* Kontainer Utama */
+        .code-wrapper {
             background: #0F172A;
-            color: #E2E8F0;
-            font-family: 'JetBrains Mono', 'Consolas', monospace;
-            font-size: 13px;
-            line-height: 1.6;
-            max-height: 500px;
-            overflow: auto;
-            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             position: relative;
+            overflow: hidden; /* Biar ujung pre gak keluar dari radius */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
-        /* Custom Scrollbar */
-        .code-box::-webkit-scrollbar { width: 8px; height: 8px; }
-        .code-box::-webkit-scrollbar-track { background: #1E293B; border-radius: 4px; }
-        .code-box::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        .code-box::-webkit-scrollbar-thumb:hover { background: #3B82F6; }
+
+        /* Area Scroll */
+        .code-box {
+            max-height: 550px;
+            overflow: auto;
+            position: relative;
+            /* Scrollbar styling */
+            scrollbar-color: #334155 #0F172A; /* Untuk Firefox */
+            scrollbar-width: thin;
+        }
+
+        /* Padding dipindahkan ke sini agar scrollbar mepet ke pinggir */
+        pre#python-code {
+            padding: 2.5rem 2rem 2rem 2rem; /* Atas lebih besar untuk tombol Mac */
+            margin: 0;
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #CBD5E1;
+            white-space: pre;
+        }
+
+        /* Tombol Mac Statis (Gak ikut scroll) */
+        .mac-dots {
+            position: absolute;
+            top: 18px;
+            left: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        /* Custom Scrollbar Chrome/Edge/Safari */
+        .code-box::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .code-box::-webkit-scrollbar-track {
+            background: transparent; /* Track transparan biar gak ada kotak aneh */
+        }
+        .code-box::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+            border: 2px solid #0F172A; /* Gap tipis biar kelihatan melayang dikit tapi rapi */
+        }
+        .code-box::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        /* Bagian sudut saat ada vertikal & horisontal scrollbar sekaligus */
+        .code-box::-webkit-scrollbar-corner {
+            background: #0F172A;
+        }
+
+        pre {
+            margin: 0;
+            white-space: pre; /* Menjaga lekukan kode Python */
+        }
 
         /* Carousel Transitions */
         .carousel-track { display: flex; transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
@@ -279,18 +333,33 @@
     </section>
 
     <!-- SOURCE CODE SECTION -->
-    <section id="code" class="max-w-5xl mx-auto px-6 py-24">
-        <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
-            <div>
-                <h2 class="text-4xl font-black text-slate-900 tracking-tight">Source Code</h2>
-                <p class="text-slate-500 font-medium mt-2">Open source. Bebas lu pake, edit, atau jual lagi (bercanda, jangan dijual).</p>
+    <section id="code" class="max-w-5xl mx-auto px-6 py-32">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+            <div class="text-left" data-aos="fade-right">
+                <h2 class="text-4xl font-black text-slate-900 tracking-tight italic flex items-center gap-3">
+                    <span class="text-primary">/_</span> Source Code
+                </h2>
+                <p class="text-slate-500 font-medium mt-3 italic">
+                    Salin, modifikasi, dan kembangkan sesuka hati.
+                </p>
             </div>
-            <button onclick="copyCode()" class="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-500/20 flex items-center gap-2 active:scale-95">
-                <i class="fas fa-copy"></i> Salin Semua
+            
+            <button onclick="copyCode()" class="bg-primary text-white px-8 py-4 rounded-2xl font-bold shadow-2xl shadow-primary/30 active:scale-95 transition-all flex items-center gap-3">
+                <i class="fas fa-copy"></i> Salin Semua Kode
             </button>
         </div>
 
-        <div class="code-box rounded-3xl shadow-2xl" data-aos="fade-up">
+        <!-- Wrapper Baru -->
+        <div class="code-wrapper" data-aos="fade-up">
+            <!-- Hiasan Tombol Mac -->
+            <div class="mac-dots">
+                <div class="dot dot-red"></div>
+                <div class="dot dot-yellow"></div>
+                <div class="dot dot-green"></div>
+            </div>
+            
+            <!-- Box Scroll -->
+            <div class="code-box">
 <pre id="python-code">
 import cv2
 import mediapipe as mp
