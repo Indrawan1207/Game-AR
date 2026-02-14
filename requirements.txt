@@ -1,0 +1,8 @@
+opencv-python
+mediapipe
+echo "opencv-python==4.8.1.78
+mediapipe==0.10.9
+numpy==1.24.3" > requirements.txt
+
+# Kemudian install dengan:
+pip install -r requirements.txt
