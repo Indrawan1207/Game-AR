@@ -1,381 +1,404 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sultan THR AR | Versi Stabil</title>
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-
-  <!-- MediaPipe -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-
-  <style>
-    body { font-family: 'Plus Jakarta Sans', sans-serif; background: #064E3B; margin: 0; overflow: hidden; }
-    canvas { width: 100vw; height: 100vh; object-fit: cover; cursor: none; }
-    .ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
-
-    .glass-sultan {
-      background: rgba(6, 78, 59, 0.85);
-      backdrop-filter: blur(15px);
-      border: 3px solid #FDE047;
-      border-radius: 2rem;
-      box-shadow: 0 15px 40px rgba(0,0,0,0.6);
-    }
-
-    .btn-interact { pointer-events: auto; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-    .btn-interact:hover { transform: scale(1.06) rotate(-1deg); }
-
-    .user-avatar { width: 60px; height: 60px; border-radius: 50%; border: 3px solid #FDE047; object-fit: cover; }
-
-    /* Flash */
-    .flash-effect { position: fixed; inset: 0; background: white; z-index: 100; opacity: 0; pointer-events: none; }
-    @keyframes do-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
-
-    /* Confetti */
-    .confetti {
-      position: fixed; top: -20px; z-index: 200;
-      border-radius: 4px; opacity: .95; will-change: transform;
-      animation: fall 1200ms linear forwards;
-    }
-    @keyframes fall { to { transform: translateY(calc(100vh + 60px)) rotate(540deg); opacity: 1; } }
-
-    /* Camera Modal */
-    .modal-bg { background: rgba(0,0,0,.72); }
-    .cam-frame { aspect-ratio: 16 / 9; width: min(720px, 92vw); border-radius: 1.5rem; overflow: hidden; border: 2px solid rgba(255,255,255,.2); }
-    .cam-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-    .mini-preview { width: 90px; height: 90px; border-radius: 1.25rem; border: 2px solid #FDE047; object-fit: cover; }
-  </style>
-</head>
-
-<body>
-  <div id="flash" class="flash-effect"></div>
-
-  <div id="loading" class="fixed inset-0 bg-[#064E3B] z-[100] flex flex-col items-center justify-center text-white">
-    <div class="w-20 h-20 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-    <p class="font-bold tracking-widest text-yellow-400 uppercase text-xs">Menghubungkan ke Satelit Sultan...</p>
-  </div>
-
-  <div id="container" class="relative">
-    <video id="input_video" class="hidden" playsinline></video>
-    <canvas id="output_canvas"></canvas>
-
-    <!-- HUD -->
-    <div id="game-hud" class="ui-layer p-6 flex justify-between items-start hidden">
-      <div class="glass-sultan p-4 flex items-center gap-4 text-white min-w-[280px]">
-        <img id="avatar-p1" src="https://ui-avatars.com/api/?name=P1&background=random" class="user-avatar" />
-        <div>
-          <p class="text-[10px] font-black text-yellow-400 uppercase tracking-widest">Sultan 1</p>
-          <h2 id="score1" class="text-2xl font-black">Rp 0</h2>
-        </div>
-      </div>
-
-      <div class="glass-sultan px-8 py-2 text-center text-white">
-        <p class="text-[9px] font-bold text-yellow-400 uppercase">Waktu</p>
-        <h2 id="timer" class="text-3xl font-black tabular-nums">60</h2>
-        <p id="level" class="text-[10px] font-black text-yellow-300 mt-1 tracking-widest">LV 1</p>
-      </div>
-
-      <div class="glass-sultan p-4 flex items-center gap-4 text-white text-right flex-row-reverse min-w-[280px]">
-        <img id="avatar-p2" src="https://ui-avatars.com/api/?name=P2&background=random" class="user-avatar" />
-        <div>
-          <p class="text-[10px] font-black text-yellow-400 uppercase tracking-widest">Sultan 2</p>
-          <h2 id="score2" class="text-2xl font-black">Rp 0</h2>
-        </div>
-      </div>
-    </div>
-
-    <!-- MENU -->
-    <div id="menu-overlay" class="ui-layer flex items-center justify-center bg-black/60">
-      <div class="glass-sultan p-10 max-w-lg text-center text-white pointer-events-auto">
-        <h1 class="text-5xl font-black text-yellow-400 mb-2 tracking-tighter">SULTAN THR</h1>
-        <p class="text-sm opacity-80 mb-8 italic">"Siapkan kantong, rebut rezeki lebaran!"</p>
-
-        <div class="flex justify-center gap-6 mb-6">
-          <div class="text-center">
-            <img id="preview-p1" src="https://ui-avatars.com/api/?name=P1&background=FDE047" class="w-20 h-20 rounded-2xl border-2 border-white object-cover" />
-            <p class="text-[10px] mt-2 font-bold uppercase">Foto P1</p>
-          </div>
-          <div class="text-center">
-            <img id="preview-p2" src="https://ui-avatars.com/api/?name=P2&background=FDE047" class="w-20 h-20 rounded-2xl border-2 border-white object-cover" />
-            <p class="text-[10px] mt-2 font-bold uppercase">Foto P2</p>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-3">
-          <button id="btn-open-cam" class="btn-interact w-full bg-yellow-400 text-green-900 py-4 rounded-xl font-black text-xl shadow-xl">
-            <i class="fas fa-camera mr-2"></i> AMBIL FOTO SULTAN
-          </button>
-          <button id="btn-start" class="btn-interact w-full bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl font-black text-xl shadow-xl">
-            <i class="fas fa-play mr-2"></i> MULAI PANEN
-          </button>
-          <button id="btn-toggle-game-mirror" class="btn-interact w-full bg-white/10 hover:bg-white/15 text-white py-3 rounded-xl font-bold">
-            <i class="fas fa-right-left mr-2"></i> MIRROR GAMEPLAY: ON
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- CAMERA CAPTURE MODAL -->
-    <div id="cam-overlay" class="ui-layer modal-bg hidden flex items-center justify-center">
-      <div class="glass-sultan p-6 max-w-3xl text-white pointer-events-auto">
-        <div class="flex items-start justify-between gap-4">
-          <h2 class="text-2xl font-black text-yellow-400">Capture Foto Sultan</h2>
-          <button id="btn-close-cam" class="btn-interact bg-white/10 hover:bg-white/15 px-4 py-2 rounded-xl font-bold"><i class="fas fa-xmark"></i></button>
-        </div>
-        <div class="mt-4 cam-frame"><video id="cam_preview" class="cam-video" playsinline muted autoplay></video></div>
-        <div class="mt-4 flex items-center justify-between flex-wrap gap-3">
-          <div class="flex gap-4">
-            <div class="text-center">
-              <img id="cap-p1" class="mini-preview" src="https://ui-avatars.com/api/?name=P1&background=FDE047" />
-              <button id="btn-cap-p1" class="btn-interact mt-2 bg-yellow-400 text-green-900 px-3 py-1 rounded-lg font-bold text-xs">Foto P1</button>
-            </div>
-            <div class="text-center">
-              <img id="cap-p2" class="mini-preview" src="https://ui-avatars.com/api/?name=P2&background=FDE047" />
-              <button id="btn-cap-p2" class="btn-interact mt-2 bg-yellow-400 text-green-900 px-3 py-1 rounded-lg font-bold text-xs">Foto P2</button>
-            </div>
-          </div>
-          <button id="btn-continue" class="btn-interact bg-green-500 hover:bg-green-400 text-green-950 px-6 py-3 rounded-xl font-black">Lanjut Main</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- RESULT -->
-    <div id="result-overlay" class="ui-layer flex items-center justify-center bg-black/80 hidden">
-      <div class="glass-sultan p-8 max-w-2xl text-center text-white pointer-events-auto">
-        <h2 id="winner-text" class="text-4xl font-black mb-6 text-yellow-400 uppercase">PLAYER 1 MENANG!</h2>
-        <div class="grid grid-cols-2 gap-4 mb-6">
-            <div class="bg-white/10 p-4 rounded-xl">
-                <p class="text-xs opacity-60">Total P1</p>
-                <h4 id="final-score1" class="text-xl font-bold">Rp 0</h4>
-            </div>
-            <div class="bg-white/10 p-4 rounded-xl">
-                <p class="text-xs opacity-60">Total P2</p>
-                <h4 id="final-score2" class="text-xl font-bold">Rp 0</h4>
-            </div>
-        </div>
-        <img id="cert-preview" class="w-full rounded-xl border-2 border-yellow-400 mb-6" />
-        <div class="flex gap-3 justify-center">
-          <button id="btn-download-cert" class="btn-interact bg-blue-600 text-white py-4 px-6 rounded-xl font-bold"><i class="fas fa-download mr-2"></i> DOWNLOAD</button>
-          <button onclick="location.reload()" class="btn-interact bg-yellow-400 text-green-900 py-4 px-6 rounded-xl font-bold">REMATCH</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-<script>
-(() => {
-  const videoElement = document.getElementById('input_video');
-  const canvasElement = document.getElementById('output_canvas');
-  const canvasCtx = canvasElement.getContext('2d');
-  const flash = document.getElementById('flash');
-
-  const WIDTH = 1280, HEIGHT = 720, NET_X = WIDTH/2;
-  canvasElement.width = WIDTH; canvasElement.height = HEIGHT;
-
-  // Variables
-  let gameState = "MENU";
-  let score = { p1:0, p2:0 };
-  let timer = 60, startTime = 0, level = 1;
-  let moneyItems = [];
-  let userPhotos = { p1:null, p2:null };
-  let GAME_MIRROR = true; // DEFAULT ON
-
-  // Performance Variables (FIX: TRACK_SCALE DITAMBAHKAN)
-  let TRACK_SCALE = 0.55;
-  let potato = false;
-  let MAX_ITEMS = 14;
-  let MP_INTERVAL = 40;
-  let SPAWN_PROB_BASE = 0.045;
-  let lastMp = 0;
-
-  // Trails
-  let trails = { p1: new Array(12).fill(null), p2: new Array(12).fill(null) };
-  let trailIdx = { p1:0, p2:0 };
-
-  const formatRupiah = (n) => "Rp " + (n|0).toLocaleString('id-ID');
-
-  // Audio
-  let audioCtx = null;
-  function playTone(f, d, t="sine", v=0.08) {
-    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = t; osc.frequency.setValueAtTime(f, audioCtx.currentTime);
-    gain.gain.setValueAtTime(v, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+d);
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(); osc.stop(audioCtx.currentTime+d);
-  }
-
-  class Money {
-    constructor(side) {
-      this.side = side;
-      const r = Math.random();
-      this.type = r<0.15?'BOMB':(r<0.30?'ANGPAO':(r<0.50?'RED':'BLUE'));
-      this.x = side==='p1' ? 60+Math.random()*(NET_X-180) : (NET_X+120)+Math.random()*(NET_X-200);
-      this.y = -80;
-      this.vy = (2+Math.random()*4) * (1+level*0.2);
-      this.vx = Math.sin(Math.random()*5)*2;
-      this.angle = 0;
-    }
-    update() { this.y += this.vy; this.x += this.vx; this.angle += 0.05; return this.y < HEIGHT+100; }
-    draw() {
-      canvasCtx.save();
-      canvasCtx.translate(this.x, this.y);
-      canvasCtx.rotate(Math.sin(this.angle)*0.3);
-      if(this.type==='BOMB') {
-        canvasCtx.fillStyle="#333"; canvasCtx.beginPath(); canvasCtx.arc(0,0,30,0,Math.PI*2); canvasCtx.fill();
-        canvasCtx.fillStyle="white"; canvasCtx.font="bold 20px Arial"; canvasCtx.fillText("💥",-15,8);
-      } else if(this.type==='ANGPAO') {
-        canvasCtx.fillStyle="#D4AF37"; canvasCtx.fillRect(-30,-40,60,80);
-        canvasCtx.fillStyle="white"; canvasCtx.font="bold 25px Arial"; canvasCtx.fillText("🧧",-15,10);
-      } else {
-        canvasCtx.fillStyle = this.type==='RED' ? "#EF4444" : "#3B82F6";
-        canvasCtx.fillRect(-55,-27,110,55);
-        canvasCtx.fillStyle="white"; canvasCtx.font="bold 16px Courier"; canvasCtx.fillText(this.type==='RED'?"100k":"50k",-30,5);
-      }
-      canvasCtx.restore();
-    }
-  }
-
-  const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-  hands.setOptions({ maxNumHands:2, modelComplexity:0, minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
-
-  hands.onResults((results) => {
-    document.getElementById('loading').style.display = 'none';
-    canvasCtx.save();
-    if(GAME_MIRROR) {
-        canvasCtx.scale(-1, 1); canvasCtx.translate(-WIDTH, 0);
-    }
-    canvasCtx.drawImage(results.image, 0, 0, WIDTH, HEIGHT);
-    canvasCtx.restore();
-
-    canvasCtx.fillStyle = "rgba(6, 78, 59, 0.4)"; canvasCtx.fillRect(0,0,WIDTH,HEIGHT);
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aether Blades | Mega Web Demo</title>
     
-    // Draw Net
-    canvasCtx.strokeStyle="#FDE047"; canvasCtx.lineWidth=4; canvasCtx.beginPath(); canvasCtx.moveTo(NET_X,0); canvasCtx.lineTo(NET_X,HEIGHT); canvasCtx.stroke();
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    if(results.multiHandLandmarks) {
-      for(const lms of results.multiHandLandmarks) {
-        const tip = lms[8];
-        // FIX MIRROR LOGIC
-        const px = (GAME_MIRROR ? (1 - tip.x) : tip.x) * WIDTH;
-        const py = tip.y * HEIGHT;
-        const side = px < NET_X ? 'p1' : 'p2';
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 
-        trails[side][trailIdx[side]] = {x:px, y:py};
-        trailIdx[side] = (trailIdx[side]+1)%12;
-
-        if(gameState==="PLAY") {
-          for(let i=moneyItems.length-1; i>=0; i--) {
-            const m = moneyItems[i];
-            if(m.side === side && Math.hypot(px-m.x, py-m.y) < 60) {
-                if(m.type==='BOMB') { playTone(100,0.5); score[side]-=150000; }
-                else if(m.type==='ANGPAO') { playTone(1200,0.1); score[side]+=200000; }
-                else { playTone(1000,0.05); score[side]+=(m.type==='RED'?100000:50000); }
-                if(score[side]<0) score[side]=0;
-                moneyItems.splice(i,1);
-            }
-          }
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #0F172A; margin: 0; overflow: hidden; }
+        canvas { width: 100vw; height: 100vh; object-fit: cover; background: #000; }
+        .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
         }
-      }
-    }
 
-    // Draw Trails
-    ['p1','p2'].forEach(s => {
-        canvasCtx.beginPath(); canvasCtx.strokeStyle = s==='p1'?'#00E6FF':'#FF8A00'; canvasCtx.lineWidth=10;
-        trails[s].forEach((p, i) => { if(p) i===0?canvasCtx.moveTo(p.x,p.y):canvasCtx.lineTo(p.x,p.y); });
-        canvasCtx.stroke();
-    });
+        /* Animasi Kemenangan */
+        @keyframes victory-pump {
+            0% { transform: scale(1); filter: drop-shadow(0 0 0px #fff); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 20px #00D1FF); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 0px #fff); }
+        }
+        .animate-victory { animation: victory-pump 0.8s infinite ease-in-out; }
 
-    if(gameState==="PLAY") {
-        const now = Date.now();
-        timer = Math.max(0, 60 - Math.floor((now-startTime)/1000));
-        timer === 0 ? endGame() : null;
-        timerEl.innerText = timer;
-        score1El.innerText = formatRupiah(score.p1); score2El.innerText = formatRupiah(score.p2);
+        .loading-overlay {
+            position: fixed; inset: 0; background: radial-gradient(circle, #1E293B 0%, #0F172A 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100; color: white; transition: opacity 0.8s;
+        }
+    </style>
+</head>
+<body>
 
-        if(Math.random()<SPAWN_PROB_BASE && moneyItems.length<MAX_ITEMS) moneyItems.push(new Money(Math.random()<0.5?'p1':'p2'));
-        moneyItems.forEach((m, i) => m.update() ? m.draw() : moneyItems.splice(i,1));
-    }
-  });
+    <div id="loading" class="loading-overlay">
+        <div class="relative">
+            <div class="w-24 h-24 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+            <i class="fas fa-bolt absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500 text-2xl"></i>
+        </div>
+        <p class="mt-6 font-bold tracking-[0.3em] animate-pulse text-blue-400 uppercase text-xs">Aether System Initializing...</p>
+    </div>
 
-  const camera = new Camera(videoElement, {
-    onFrame: async () => {
-      if(performance.now()-lastMp < MP_INTERVAL) return;
-      lastMp = performance.now();
-      await hands.send({ image: videoElement });
-    },
-    width:1280, height:720
-  });
+    <div id="container" class="relative">
+        <video id="input_video" class="hidden" playsinline></video>
+        <canvas id="output_canvas"></canvas>
 
-  function endGame() {
-    gameState = "RESULT";
-    flash.style.animation = "do-flash 0.5s forwards";
-    document.getElementById('result-overlay').classList.remove('hidden');
-    document.getElementById('game-hud').classList.add('hidden');
-    
-    document.getElementById('final-score1').innerText = formatRupiah(score.p1);
-    document.getElementById('final-score2').innerText = formatRupiah(score.p2);
-    document.getElementById('winner-text').innerText = score.p1 > score.p2 ? "PLAYER 1 SULTAN!" : "PLAYER 2 SULTAN!";
-    
-    // Simple Cert Render
-    const certCanvas = document.createElement('canvas');
-    certCanvas.width=800; certCanvas.height=400;
-    const ctx = certCanvas.getContext('2d');
-    ctx.fillStyle="#064E3B"; ctx.fillRect(0,0,800,400);
-    ctx.strokeStyle="#FDE047"; ctx.lineWidth=10; ctx.strokeRect(20,20,760,360);
-    ctx.fillStyle="#FDE047"; ctx.font="bold 40px Arial"; ctx.textAlign="center";
-    ctx.fillText("SERTIFIKAT SULTAN THR", 400, 100);
-    ctx.fillStyle="#FFF"; ctx.font="30px Arial";
-    ctx.fillText(score.p1 > score.p2 ? "PLAYER 1" : "PLAYER 2", 400, 200);
-    ctx.fillText(formatRupiah(Math.max(score.p1, score.p2)), 400, 280);
-    document.getElementById('cert-preview').src = certCanvas.toDataURL();
-  }
+        <!-- UI HUD -->
+        <div class="ui-layer p-8 flex justify-between items-start">
+            <div class="glass p-5 w-56 text-white border-l-4 border-l-yellow-400">
+                <p class="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">P1 Cyan Blade</p>
+                <div class="flex items-end gap-2">
+                    <h2 id="score1" class="text-4xl font-black">0</h2>
+                    <span class="text-xs mb-1 opacity-40">PTS</span>
+                </div>
+            </div>
 
-  // Buttons Logic
-  document.getElementById('btn-start').onclick = () => {
-    startTime = Date.now(); gameState="PLAY";
-    document.getElementById('menu-overlay').classList.add('hidden');
-    document.getElementById('game-hud').classList.remove('hidden');
-    if(audioCtx) audioCtx.resume();
-  };
+            <div class="text-center">
+                <div class="glass px-8 py-3 text-white border-b-4 border-b-blue-500">
+                    <p class="text-[9px] font-bold opacity-50 uppercase mb-1">Time Remaining</p>
+                    <h2 id="timer" class="text-3xl font-black tabular-nums">60</h2>
+                </div>
+            </div>
 
-  document.getElementById('btn-toggle-game-mirror').onclick = function() {
-    GAME_MIRROR = !GAME_MIRROR;
-    this.innerText = `MIRROR GAMEPLAY: ${GAME_MIRROR?'ON':'OFF'}`;
-  };
+            <div class="glass p-5 w-56 text-right text-white border-r-4 border-r-blue-500">
+                <p class="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">P2 Ember Blade</p>
+                <div class="flex items-end justify-end gap-2">
+                    <span class="text-xs mb-1 opacity-40">PTS</span>
+                    <h2 id="score2" class="text-4xl font-black">0</h2>
+                </div>
+            </div>
+        </div>
 
-  document.getElementById('btn-open-cam').onclick = () => {
-    document.getElementById('cam-overlay').classList.remove('hidden');
-    document.getElementById('cam_preview').srcObject = videoElement.srcObject;
-  };
+        <!-- Tombol Keluar -->
+        <a href="index.html" class="fixed bottom-8 left-8 z-50 glass px-6 py-3 text-white font-bold hover:bg-white/20 transition flex items-center gap-2 pointer-events-auto">
+            <i class="fas fa-home"></i> Menu Utama
+        </a>
+    </div>
 
-  document.getElementById('btn-cap-p1').onclick = () => {
-    const c = document.createElement('canvas'); c.width=200; c.height=200;
-    c.getContext('2d').drawImage(document.getElementById('cam_preview'), 0,0,200,200);
-    const data = c.toDataURL();
-    document.getElementById('cap-p1').src = data; document.getElementById('preview-p1').src = data; document.getElementById('avatar-p1').src = data;
-    userPhotos.p1 = data;
-  };
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const loading = document.getElementById('loading');
 
-  document.getElementById('btn-cap-p2').onclick = () => {
-    const c = document.createElement('canvas'); c.width=200; c.height=200;
-    c.getContext('2d').drawImage(document.getElementById('cam_preview'), 0,0,200,200);
-    const data = c.toDataURL();
-    document.getElementById('cap-p2').src = data; document.getElementById('preview-p2').src = data; document.getElementById('avatar-p2').src = data;
-    userPhotos.p2 = data;
-  };
+        const WIDTH = 1280;
+        const HEIGHT = 720;
+        const NET_X = WIDTH / 2;
 
-  document.getElementById('btn-continue').onclick = () => document.getElementById('cam-overlay').classList.add('hidden');
-  document.getElementById('btn-close-cam').onclick = () => document.getElementById('cam-overlay').classList.add('hidden');
+        let gameState = "MENU"; 
+        let score = { p1: 0, p2: 0 };
+        let timer = 60;
+        let startTime = 0;
+        let fruits = [];
+        let particles = [];
+        let confetti = [];
+        let trails = { p1: [], p2: [] };
 
-  camera.start();
-})();
-</script>
+        canvasElement.width = WIDTH;
+        canvasElement.height = HEIGHT;
+
+        // --- AUDIO ENGINE ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let bgmInterval;
+
+        function playTone(freq, dur, type="sine", vol=0.1) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + dur);
+        }
+
+        // Background Music (Synth Bassline)
+        function startBGM() {
+            if(bgmInterval) return;
+            const notes = [110, 110, 130, 146, 110, 110, 164, 146]; // Bassline
+            let step = 0;
+            bgmInterval = setInterval(() => {
+                if(gameState === "PLAY") {
+                    playTone(notes[step % notes.length], 0.4, "sawtooth", 0.05);
+                    if(step % 4 === 0) playTone(440, 0.05, "square", 0.02); // Hi-hat
+                    step++;
+                }
+            }, 200);
+        }
+
+        // --- GAME CLASSES ---
+        class Fruit {
+            constructor(side) {
+                this.side = side;
+                this.radius = 45;
+                this.isBomb = Math.random() < 0.15;
+                this.color = side === 'p1' ? '#FFE600' : '#008CFF';
+                if (this.isBomb) this.color = '#28282D';
+
+                this.x = side === 'p1' ? 100 + Math.random() * (NET_X - 200) : (NET_X + 100) + Math.random() * (NET_X - 200);
+                this.y = HEIGHT + 50;
+                this.vx = side === 'p1' ? 2 + Math.random() * 3 : -(2 + Math.random() * 3);
+                this.vy = -(19 + Math.random() * 7);
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy; this.vy += 0.5;
+                return this.y < HEIGHT + 100;
+            }
+            draw() {
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.shadowColor = this.color;
+                canvasCtx.beginPath();
+                canvasCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                canvasCtx.fillStyle = this.color;
+                canvasCtx.fill();
+                canvasCtx.shadowBlur = 0;
+                if(this.isBomb) {
+                    canvasCtx.fillStyle = "red";
+                    canvasCtx.font = "bold 40px Arial";
+                    canvasCtx.fillText("X", this.x-13, this.y+14);
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, speed=10) {
+                this.x = x; this.y = y; this.color = color;
+                this.vx = (Math.random() - 0.5) * speed;
+                this.vy = (Math.random() - 0.5) * speed;
+                this.life = 1.0;
+            }
+            update() { this.x += this.vx; this.y += this.vy; this.life -= 0.03; }
+            draw() {
+                canvasCtx.globalAlpha = this.life;
+                canvasCtx.fillStyle = this.color;
+                canvasCtx.fillRect(this.x, this.y, 8, 8);
+                canvasCtx.globalAlpha = 1.0;
+            }
+        }
+
+        class Confetti {
+            constructor() {
+                this.x = Math.random() * WIDTH;
+                this.y = -10;
+                this.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                this.size = Math.random() * 10 + 5;
+                this.vx = (Math.random() - 0.5) * 5;
+                this.vy = Math.random() * 5 + 2;
+                this.rot = Math.random() * 360;
+            }
+            update() {
+                this.y += this.vy; this.x += this.vx; this.rot += 5;
+                return this.y < HEIGHT;
+            }
+            draw() {
+                canvasCtx.save();
+                canvasCtx.translate(this.x, this.y);
+                canvasCtx.rotate(this.rot * Math.PI / 180);
+                canvasCtx.fillStyle = this.color;
+                canvasCtx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+                canvasCtx.restore();
+            }
+        }
+
+        // --- CORE LOGIC ---
+        function onResults(results) {
+            if (loading.style.opacity !== '0') loading.style.opacity = '0';
+
+            // Draw Cam
+            canvasCtx.save();
+            canvasCtx.scale(-1, 1);
+            canvasCtx.translate(-WIDTH, 0);
+            canvasCtx.drawImage(results.image, 0, 0, WIDTH, HEIGHT);
+            canvasCtx.restore();
+
+            // Overlay
+            canvasCtx.fillStyle = "rgba(15, 23, 42, 0.5)";
+            canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            let tips = { p1: null, p2: null };
+            if (results.multiHandLandmarks) {
+                for (const landmarks of results.multiHandLandmarks) {
+                    const tip = landmarks[8];
+                    const px = (1 - tip.x) * WIDTH;
+                    const py = tip.y * HEIGHT;
+                    const side = px < NET_X ? 'p1' : 'p2';
+                    tips[side] = { x: px, y: py };
+                    trails[side].push({x: px, y: py});
+                    if (trails[side].length > 12) trails[side].shift();
+                }
+            }
+
+            // Draw Net
+            canvasCtx.strokeStyle = "rgba(255,255,255,0.1)";
+            canvasCtx.setLineDash([10, 10]);
+            canvasCtx.beginPath(); canvasCtx.moveTo(NET_X, 0); canvasCtx.lineTo(NET_X, HEIGHT); canvasCtx.stroke();
+            canvasCtx.setLineDash([]);
+
+            // Draw Trails
+            ['p1', 'p2'].forEach(s => {
+                if (trails[s].length > 1) {
+                    canvasCtx.beginPath();
+                    canvasCtx.strokeStyle = s === 'p1' ? '#FFE600' : '#008CFF';
+                    canvasCtx.lineWidth = 10; canvasCtx.lineCap = 'round';
+                    canvasCtx.moveTo(trails[s][0].x, trails[s][0].y);
+                    for (let i = 1; i < trails[s].length; i++) canvasCtx.lineTo(trails[s][i].x, trails[s][i].y);
+                    canvasCtx.stroke();
+                }
+            });
+
+            if (gameState === "MENU") drawMenu(tips);
+            else if (gameState === "PLAY") updatePlay(tips);
+            else drawGameOver();
+        }
+
+        function drawMenu(tips) {
+            canvasCtx.fillStyle = "white";
+            canvasCtx.textAlign = "center";
+            canvasCtx.font = "900 70px Plus Jakarta Sans";
+            canvasCtx.fillText("AETHER BLADES", WIDTH/2, HEIGHT/2 - 50);
+            
+            canvasCtx.font = "bold 20px Plus Jakarta Sans";
+            canvasCtx.fillStyle = "rgba(255,255,255,0.6)";
+            canvasCtx.fillText("TEBAS LOGO UNTUK MULAI", WIDTH/2, HEIGHT/2 + 120);
+
+            const cx = WIDTH/2, cy = HEIGHT/2 + 30;
+            canvasCtx.beginPath();
+            canvasCtx.arc(cx, cy, 60, 0, Math.PI*2);
+            canvasCtx.strokeStyle = "#00D1FF";
+            canvasCtx.lineWidth = 5;
+            canvasCtx.stroke();
+            canvasCtx.fillStyle = "white";
+            canvasCtx.font = "30px FontAwesome";
+            canvasCtx.fillText("\uf0e7", cx, cy + 10); // Bolt icon
+
+            ['p1', 'p2'].forEach(s => {
+                if (tips[s] && Math.hypot(tips[s].x - cx, tips[s].y - cy) < 60) {
+                    audioCtx.resume();
+                    startBGM();
+                    playTone(523.25, 0.1, "square");
+                    playTone(659.25, 0.1, "square");
+                    playTone(783.99, 0.3, "square");
+                    gameState = "PLAY";
+                    startTime = Date.now();
+                }
+            });
+        }
+
+        function updatePlay(tips) {
+            timer = Math.max(0, 60 - Math.floor((Date.now() - startTime) / 1000));
+            document.getElementById('timer').innerText = timer;
+            document.getElementById('score1').innerText = score.p1;
+            document.getElementById('score2').innerText = score.p2;
+
+            if (timer <= 0) {
+                gameState = "GAMEOVER";
+                triggerVictoryEffect();
+            }
+
+            if (Math.random() < 0.04 && fruits.length < 10) {
+                fruits.push(new Fruit('p1'));
+                fruits.push(new Fruit('p2'));
+            }
+
+            for (let i = fruits.length - 1; i >= 0; i--) {
+                const f = fruits[i];
+                if (!f.update()) { fruits.splice(i, 1); continue; }
+                f.draw();
+
+                ['p1', 'p2'].forEach(s => {
+                    if (tips[s]) {
+                        if ((s === 'p1' && f.x > NET_X) || (s === 'p2' && f.x < NET_X)) return;
+                        if (Math.hypot(tips[s].x - f.x, tips[s].y - f.y) < f.radius + 20) {
+                            if (f.isBomb) {
+                                playTone(100, 0.4, "sawtooth", 0.2);
+                                score[s] = Math.max(0, score[s] - 50);
+                                for(let j=0; j<20; j++) particles.push(new Particle(f.x, f.y, 'red', 15));
+                            } else {
+                                playTone(800 + Math.random()*400, 0.05, "sine", 0.1);
+                                score[s] += 10;
+                                for(let j=0; j<12; j++) particles.push(new Particle(f.x, f.y, f.color));
+                            }
+                            fruits.splice(i, 1);
+                        }
+                    }
+                });
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update(); particles[i].draw();
+                if (particles[i].life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function triggerVictoryEffect() {
+            // Suara Kemenangan "Ta-da!"
+            playTone(523.25, 0.2, "square", 0.1);
+            setTimeout(() => playTone(659.25, 0.2, "square", 0.1), 150);
+            setTimeout(() => playTone(783.99, 0.5, "square", 0.1), 300);
+            
+            // Generate Confetti
+            for(let i=0; i<100; i++) confetti.push(new Confetti());
+        }
+
+        function drawGameOver() {
+            canvasCtx.fillStyle = "rgba(15, 23, 42, 0.85)";
+            canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+            
+            // Draw Confetti
+            for (let i = confetti.length - 1; i >= 0; i--) {
+                if(!confetti[i].update()) confetti.splice(i,1);
+                else confetti[i].draw();
+            }
+
+            canvasCtx.textAlign = "center";
+            canvasCtx.fillStyle = "white";
+            canvasCtx.font = "bold 30px Plus Jakarta Sans";
+            canvasCtx.fillText("MATCH CONCLUDED", WIDTH/2, HEIGHT/2 - 80);
+
+            let winText = score.p1 > score.p2 ? "PLAYER 1 DOMINATES!" : (score.p2 > score.p1 ? "PLAYER 2 DOMINATES!" : "ITS A TIE!");
+            let winColor = score.p1 > score.p2 ? "#FFE600" : (score.p2 > score.p1 ? "#008CFF" : "white");
+
+            canvasCtx.font = "900 60px Plus Jakarta Sans";
+            canvasCtx.fillStyle = winColor;
+            
+            // Efek Pulsing sederhana di canvas
+            const scale = 1 + Math.sin(Date.now()/200) * 0.05;
+            canvasCtx.save();
+            canvasCtx.translate(WIDTH/2, HEIGHT/2);
+            canvasCtx.scale(scale, scale);
+            canvasCtx.fillText(winText, 0, 20);
+            canvasCtx.restore();
+
+            canvasCtx.font = "bold 20px Plus Jakarta Sans";
+            canvasCtx.fillStyle = "rgba(255,255,255,0.5)";
+            canvasCtx.fillText("TEKAN F5 UNTUK TANDING ULANG", WIDTH/2, HEIGHT/2 + 120);
+        }
+
+        // Setup MediaPipe
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 1280, height: 720
+        });
+        camera.start();
+    </script>
 </body>
 </html>

@@ -2,8 +2,8 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aether Blades | Mega Web Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aether Blades | Mobile Responsive</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
@@ -13,76 +13,101 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #0F172A; margin: 0; overflow: hidden; }
-        canvas { width: 100vw; height: 100vh; object-fit: cover; background: #000; }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: #0F172A; 
+            margin: 0; 
+            overflow: hidden; 
+            touch-action: none; /* Mencegah scroll/zoom di mobile */
+        }
+        canvas { display: block; width: 100vw; height: 100vh; object-fit: cover; }
+        
         .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
         
         .glass {
             background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
+            backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 1.5rem;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border-radius: 1rem;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
         }
-
-        /* Animasi Kemenangan */
-        @keyframes victory-pump {
-            0% { transform: scale(1); filter: drop-shadow(0 0 0px #fff); }
-            50% { transform: scale(1.1); filter: drop-shadow(0 0 20px #00D1FF); }
-            100% { transform: scale(1); filter: drop-shadow(0 0 0px #fff); }
-        }
-        .animate-victory { animation: victory-pump 0.8s infinite ease-in-out; }
 
         .loading-overlay {
             position: fixed; inset: 0; background: radial-gradient(circle, #1E293B 0%, #0F172A 100%);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 100; color: white; transition: opacity 0.8s;
         }
+
+        /* Landscape Enforcer */
+        #rotate-message {
+            display: none;
+            position: fixed; inset: 0; z-index: 999;
+            background: #0F172A; color: white;
+            flex-direction: column; align-items: center; justify-content: center; text-align: center;
+        }
+        
+        /* Tampilkan pesan putar jika layar vertikal (Portrait) */
+        @media screen and (orientation: portrait) {
+            #rotate-message { display: flex; }
+            #container { display: none; }
+        }
     </style>
 </head>
 <body>
 
+    <!-- Overlay Loading -->
     <div id="loading" class="loading-overlay">
         <div class="relative">
-            <div class="w-24 h-24 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-            <i class="fas fa-bolt absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500 text-2xl"></i>
+            <div class="w-20 h-20 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+            <i class="fas fa-hand-paper absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500 text-xl"></i>
         </div>
-        <p class="mt-6 font-bold tracking-[0.3em] animate-pulse text-blue-400 uppercase text-xs">Aether System Initializing...</p>
+        <p class="mt-4 font-bold tracking-widest animate-pulse text-blue-400 uppercase text-[10px] md:text-xs">Initializing Camera...</p>
     </div>
 
-    <div id="container" class="relative">
+    <!-- Overlay Minta Putar Layar (Mobile) -->
+    <div id="rotate-message">
+        <i class="fas fa-mobile-screen-button text-6xl mb-4 animate-bounce text-yellow-400 rotate-90"></i>
+        <h2 class="text-2xl font-bold mb-2">Putar Layar Anda</h2>
+        <p class="text-gray-400 text-sm px-8">Game ini dimainkan dalam mode Landscape.</p>
+    </div>
+
+    <div id="container" class="relative w-full h-full">
         <video id="input_video" class="hidden" playsinline></video>
         <canvas id="output_canvas"></canvas>
 
-        <!-- UI HUD -->
-        <div class="ui-layer p-8 flex justify-between items-start">
-            <div class="glass p-5 w-56 text-white border-l-4 border-l-yellow-400">
-                <p class="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">P1 Cyan Blade</p>
-                <div class="flex items-end gap-2">
-                    <h2 id="score1" class="text-4xl font-black">0</h2>
-                    <span class="text-xs mb-1 opacity-40">PTS</span>
+        <!-- UI HUD Responsive -->
+        <div class="ui-layer p-2 md:p-8 flex justify-between items-start">
+            
+            <!-- Player 1 Score -->
+            <div class="glass p-3 md:p-5 w-28 md:w-56 text-white border-l-4 border-l-yellow-400 transform scale-90 origin-top-left md:scale-100">
+                <p class="text-[8px] md:text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">P1 Cyan</p>
+                <div class="flex items-end gap-1 md:gap-2">
+                    <h2 id="score1" class="text-2xl md:text-4xl font-black">0</h2>
+                    <span class="text-[8px] md:text-xs mb-1 opacity-40">PTS</span>
                 </div>
             </div>
 
-            <div class="text-center">
-                <div class="glass px-8 py-3 text-white border-b-4 border-b-blue-500">
-                    <p class="text-[9px] font-bold opacity-50 uppercase mb-1">Time Remaining</p>
-                    <h2 id="timer" class="text-3xl font-black tabular-nums">60</h2>
+            <!-- Timer -->
+            <div class="text-center absolute left-1/2 -translate-x-1/2 top-2 md:top-8">
+                <div class="glass px-4 py-2 md:px-8 md:py-3 text-white border-b-4 border-b-blue-500">
+                    <p class="text-[8px] md:text-[9px] font-bold opacity-50 uppercase mb-0 md:mb-1">Time</p>
+                    <h2 id="timer" class="text-xl md:text-3xl font-black tabular-nums leading-none">60</h2>
                 </div>
             </div>
 
-            <div class="glass p-5 w-56 text-right text-white border-r-4 border-r-blue-500">
-                <p class="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">P2 Ember Blade</p>
-                <div class="flex items-end justify-end gap-2">
-                    <span class="text-xs mb-1 opacity-40">PTS</span>
-                    <h2 id="score2" class="text-4xl font-black">0</h2>
+            <!-- Player 2 Score -->
+            <div class="glass p-3 md:p-5 w-28 md:w-56 text-right text-white border-r-4 border-r-blue-500 transform scale-90 origin-top-right md:scale-100">
+                <p class="text-[8px] md:text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">P2 Ember</p>
+                <div class="flex items-end justify-end gap-1 md:gap-2">
+                    <span class="text-[8px] md:text-xs mb-1 opacity-40">PTS</span>
+                    <h2 id="score2" class="text-2xl md:text-4xl font-black">0</h2>
                 </div>
             </div>
         </div>
 
-        <!-- Tombol Keluar -->
-        <a href="index.html" class="fixed bottom-8 left-8 z-50 glass px-6 py-3 text-white font-bold hover:bg-white/20 transition flex items-center gap-2 pointer-events-auto">
-            <i class="fas fa-home"></i> Menu Utama
+        <!-- Tombol Keluar (Bottom Left) -->
+        <a href="index.html" class="fixed bottom-4 left-4 md:bottom-8 md:left-8 z-50 glass px-4 py-2 md:px-6 md:py-3 text-white font-bold hover:bg-white/20 transition flex items-center gap-2 pointer-events-auto text-xs md:text-base">
+            <i class="fas fa-home"></i> <span class="hidden md:inline">Menu Utama</span>
         </a>
     </div>
 
@@ -92,9 +117,10 @@
         const canvasCtx = canvasElement.getContext('2d');
         const loading = document.getElementById('loading');
 
-        const WIDTH = 1280;
-        const HEIGHT = 720;
-        const NET_X = WIDTH / 2;
+        // Variabel Dimensi Dinamis
+        let WIDTH = window.innerWidth;
+        let HEIGHT = window.innerHeight;
+        let NET_X = WIDTH / 2;
 
         let gameState = "MENU"; 
         let score = { p1: 0, p2: 0 };
@@ -102,15 +128,34 @@
         let startTime = 0;
         let fruits = [];
         let particles = [];
-        let confetti = [];
         let trails = { p1: [], p2: [] };
+        
+        // --- RESIZE HANDLING ---
+        function resizeCanvas() {
+            WIDTH = window.innerWidth;
+            HEIGHT = window.innerHeight;
+            canvasElement.width = WIDTH;
+            canvasElement.height = HEIGHT;
+            NET_X = WIDTH / 2;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // Init
 
-        canvasElement.width = WIDTH;
-        canvasElement.height = HEIGHT;
-
-        // --- AUDIO ENGINE ---
+        // --- AUDIO ENGINE (Mobile Safe) ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let bgmInterval;
+
+        // Hack untuk unlock audio context di mobile saat tap pertama
+        document.body.addEventListener('touchstart', function() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
+        document.body.addEventListener('click', function() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
 
         function playTone(freq, dur, type="sine", vol=0.1) {
             const osc = audioCtx.createOscillator();
@@ -125,40 +170,50 @@
             osc.stop(audioCtx.currentTime + dur);
         }
 
-        // Background Music (Synth Bassline)
+        // BGM Sederhana
         function startBGM() {
             if(bgmInterval) return;
-            const notes = [110, 110, 130, 146, 110, 110, 164, 146]; // Bassline
             let step = 0;
+            const notes = [110, 110, 130, 146, 110, 110, 164, 146]; 
             bgmInterval = setInterval(() => {
                 if(gameState === "PLAY") {
-                    playTone(notes[step % notes.length], 0.4, "sawtooth", 0.05);
-                    if(step % 4 === 0) playTone(440, 0.05, "square", 0.02); // Hi-hat
+                    playTone(notes[step % notes.length], 0.3, "sawtooth", 0.03);
                     step++;
                 }
-            }, 200);
+            }, 250);
         }
 
-        // --- GAME CLASSES ---
+        // --- GAME OBJECTS ---
         class Fruit {
             constructor(side) {
                 this.side = side;
-                this.radius = 45;
+                // Skala ukuran buah berdasarkan lebar layar
+                this.baseRadius = WIDTH < 600 ? 30 : 45; 
+                this.radius = this.baseRadius;
                 this.isBomb = Math.random() < 0.15;
                 this.color = side === 'p1' ? '#FFE600' : '#008CFF';
                 if (this.isBomb) this.color = '#28282D';
 
-                this.x = side === 'p1' ? 100 + Math.random() * (NET_X - 200) : (NET_X + 100) + Math.random() * (NET_X - 200);
+                // Spawn logic menyesuaikan lebar layar
+                const range = (NET_X - 100); 
+                const offset = side === 'p1' ? 50 : NET_X + 50;
+                
+                this.x = offset + Math.random() * (range > 0 ? range : 50);
                 this.y = HEIGHT + 50;
-                this.vx = side === 'p1' ? 2 + Math.random() * 3 : -(2 + Math.random() * 3);
-                this.vy = -(19 + Math.random() * 7);
+                
+                // Kecepatan Y menyesuaikan tinggi layar
+                const speedMulti = HEIGHT / 720; 
+                this.vx = side === 'p1' ? 2 + Math.random() * 2 : -(2 + Math.random() * 2);
+                this.vy = -(15 + Math.random() * 5) * speedMulti;
             }
             update() {
-                this.x += this.vx; this.y += this.vy; this.vy += 0.5;
+                this.x += this.vx; 
+                this.y += this.vy; 
+                this.vy += 0.4; // Gravity
                 return this.y < HEIGHT + 100;
             }
             draw() {
-                canvasCtx.shadowBlur = 15;
+                canvasCtx.shadowBlur = 10;
                 canvasCtx.shadowColor = this.color;
                 canvasCtx.beginPath();
                 canvasCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -167,82 +222,66 @@
                 canvasCtx.shadowBlur = 0;
                 if(this.isBomb) {
                     canvasCtx.fillStyle = "red";
-                    canvasCtx.font = "bold 40px Arial";
-                    canvasCtx.fillText("X", this.x-13, this.y+14);
+                    canvasCtx.font = `bold ${this.radius}px Arial`;
+                    canvasCtx.textAlign = "center";
+                    canvasCtx.textBaseline = "middle";
+                    canvasCtx.fillText("X", this.x, this.y);
                 }
             }
         }
 
         class Particle {
-            constructor(x, y, color, speed=10) {
+            constructor(x, y, color) {
                 this.x = x; this.y = y; this.color = color;
-                this.vx = (Math.random() - 0.5) * speed;
-                this.vy = (Math.random() - 0.5) * speed;
+                this.vx = (Math.random() - 0.5) * 10;
+                this.vy = (Math.random() - 0.5) * 10;
                 this.life = 1.0;
             }
-            update() { this.x += this.vx; this.y += this.vy; this.life -= 0.03; }
+            update() { this.x += this.vx; this.y += this.vy; this.life -= 0.05; }
             draw() {
-                canvasCtx.globalAlpha = this.life;
+                canvasCtx.globalAlpha = Math.max(0, this.life);
                 canvasCtx.fillStyle = this.color;
-                canvasCtx.fillRect(this.x, this.y, 8, 8);
+                canvasCtx.beginPath();
+                canvasCtx.arc(this.x, this.y, 4, 0, Math.PI*2);
+                canvasCtx.fill();
                 canvasCtx.globalAlpha = 1.0;
             }
         }
 
-        class Confetti {
-            constructor() {
-                this.x = Math.random() * WIDTH;
-                this.y = -10;
-                this.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
-                this.size = Math.random() * 10 + 5;
-                this.vx = (Math.random() - 0.5) * 5;
-                this.vy = Math.random() * 5 + 2;
-                this.rot = Math.random() * 360;
-            }
-            update() {
-                this.y += this.vy; this.x += this.vx; this.rot += 5;
-                return this.y < HEIGHT;
-            }
-            draw() {
-                canvasCtx.save();
-                canvasCtx.translate(this.x, this.y);
-                canvasCtx.rotate(this.rot * Math.PI / 180);
-                canvasCtx.fillStyle = this.color;
-                canvasCtx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
-                canvasCtx.restore();
-            }
-        }
-
-        // --- CORE LOGIC ---
+        // --- MAIN LOGIC ---
         function onResults(results) {
             if (loading.style.opacity !== '0') loading.style.opacity = '0';
 
-            // Draw Cam
+            // Draw Camera Feed (Stretched to fill canvas - crucial for responsiveness)
             canvasCtx.save();
             canvasCtx.scale(-1, 1);
             canvasCtx.translate(-WIDTH, 0);
             canvasCtx.drawImage(results.image, 0, 0, WIDTH, HEIGHT);
             canvasCtx.restore();
 
-            // Overlay
-            canvasCtx.fillStyle = "rgba(15, 23, 42, 0.5)";
+            // Darken Overlay
+            canvasCtx.fillStyle = "rgba(15, 23, 42, 0.6)";
             canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
 
+            // Hand Tracking
             let tips = { p1: null, p2: null };
             if (results.multiHandLandmarks) {
                 for (const landmarks of results.multiHandLandmarks) {
-                    const tip = landmarks[8];
+                    const tip = landmarks[8]; // Index finger tip
+                    // Map 0-1 coords directly to current Canvas Width/Height
                     const px = (1 - tip.x) * WIDTH;
                     const py = tip.y * HEIGHT;
+                    
                     const side = px < NET_X ? 'p1' : 'p2';
                     tips[side] = { x: px, y: py };
                     trails[side].push({x: px, y: py});
-                    if (trails[side].length > 12) trails[side].shift();
+                    if (trails[side].length > 10) trails[side].shift();
                 }
             }
 
             // Draw Net
-            canvasCtx.strokeStyle = "rgba(255,255,255,0.1)";
+            canvasCtx.strokeStyle = "rgba(255,255,255,0.2)";
+            canvasCtx.lineWidth = 2;
             canvasCtx.setLineDash([10, 10]);
             canvasCtx.beginPath(); canvasCtx.moveTo(NET_X, 0); canvasCtx.lineTo(NET_X, HEIGHT); canvasCtx.stroke();
             canvasCtx.setLineDash([]);
@@ -252,7 +291,8 @@
                 if (trails[s].length > 1) {
                     canvasCtx.beginPath();
                     canvasCtx.strokeStyle = s === 'p1' ? '#FFE600' : '#008CFF';
-                    canvasCtx.lineWidth = 10; canvasCtx.lineCap = 'round';
+                    canvasCtx.lineWidth = WIDTH < 600 ? 6 : 10; 
+                    canvasCtx.lineCap = 'round';
                     canvasCtx.moveTo(trails[s][0].x, trails[s][0].y);
                     for (let i = 1; i < trails[s].length; i++) canvasCtx.lineTo(trails[s][i].x, trails[s][i].y);
                     canvasCtx.stroke();
@@ -267,34 +307,43 @@
         function drawMenu(tips) {
             canvasCtx.fillStyle = "white";
             canvasCtx.textAlign = "center";
-            canvasCtx.font = "900 70px Plus Jakarta Sans";
-            canvasCtx.fillText("AETHER BLADES", WIDTH/2, HEIGHT/2 - 50);
             
-            canvasCtx.font = "bold 20px Plus Jakarta Sans";
-            canvasCtx.fillStyle = "rgba(255,255,255,0.6)";
-            canvasCtx.fillText("TEBAS LOGO UNTUK MULAI", WIDTH/2, HEIGHT/2 + 120);
+            // Responsive Fonts
+            const titleSize = Math.min(WIDTH * 0.1, 70);
+            canvasCtx.font = `900 ${titleSize}px Plus Jakarta Sans`;
+            canvasCtx.fillText("AETHER BLADES", WIDTH/2, HEIGHT/2 - titleSize);
+            
+            const subSize = Math.min(WIDTH * 0.04, 20);
+            canvasCtx.font = `bold ${subSize}px Plus Jakarta Sans`;
+            canvasCtx.fillStyle = "rgba(255,255,255,0.7)";
+            canvasCtx.fillText("TEBAS TOMBOL UNTUK MULAI", WIDTH/2, HEIGHT/2 + titleSize * 1.5);
 
+            const btnRadius = Math.min(WIDTH * 0.08, 60);
             const cx = WIDTH/2, cy = HEIGHT/2 + 30;
+            
             canvasCtx.beginPath();
-            canvasCtx.arc(cx, cy, 60, 0, Math.PI*2);
+            canvasCtx.arc(cx, cy, btnRadius, 0, Math.PI*2);
             canvasCtx.strokeStyle = "#00D1FF";
             canvasCtx.lineWidth = 5;
             canvasCtx.stroke();
+            
             canvasCtx.fillStyle = "white";
-            canvasCtx.font = "30px FontAwesome";
-            canvasCtx.fillText("\uf0e7", cx, cy + 10); // Bolt icon
+            canvasCtx.font = `${btnRadius/2}px FontAwesome`;
+            canvasCtx.textBaseline = "middle";
+            canvasCtx.fillText("\uf04b", cx + (btnRadius*0.1), cy); // Play icon adjusted
 
+            // Check collision with Start Button
             ['p1', 'p2'].forEach(s => {
-                if (tips[s] && Math.hypot(tips[s].x - cx, tips[s].y - cy) < 60) {
-                    audioCtx.resume();
-                    startBGM();
+                if (tips[s] && Math.hypot(tips[s].x - cx, tips[s].y - cy) < btnRadius) {
+                    audioCtx.resume(); // Ensure audio is on
                     playTone(523.25, 0.1, "square");
                     playTone(659.25, 0.1, "square");
-                    playTone(783.99, 0.3, "square");
                     gameState = "PLAY";
                     startTime = Date.now();
+                    startBGM();
                 }
             });
+            canvasCtx.textBaseline = "alphabetic"; // Reset
         }
 
         function updatePlay(tips) {
@@ -303,12 +352,10 @@
             document.getElementById('score1').innerText = score.p1;
             document.getElementById('score2').innerText = score.p2;
 
-            if (timer <= 0) {
-                gameState = "GAMEOVER";
-                triggerVictoryEffect();
-            }
+            if (timer <= 0) gameState = "GAMEOVER";
 
-            if (Math.random() < 0.04 && fruits.length < 10) {
+            // Spawn rate adjusted for performance
+            if (Math.random() < 0.03 && fruits.length < 8) {
                 fruits.push(new Fruit('p1'));
                 fruits.push(new Fruit('p2'));
             }
@@ -320,16 +367,18 @@
 
                 ['p1', 'p2'].forEach(s => {
                     if (tips[s]) {
+                        // Prevent crossing net logic
                         if ((s === 'p1' && f.x > NET_X) || (s === 'p2' && f.x < NET_X)) return;
+                        
                         if (Math.hypot(tips[s].x - f.x, tips[s].y - f.y) < f.radius + 20) {
                             if (f.isBomb) {
-                                playTone(100, 0.4, "sawtooth", 0.2);
+                                playTone(100, 0.2, "sawtooth", 0.3);
                                 score[s] = Math.max(0, score[s] - 50);
-                                for(let j=0; j<20; j++) particles.push(new Particle(f.x, f.y, 'red', 15));
+                                for(let j=0; j<10; j++) particles.push(new Particle(f.x, f.y, 'red'));
                             } else {
                                 playTone(800 + Math.random()*400, 0.05, "sine", 0.1);
                                 score[s] += 10;
-                                for(let j=0; j<12; j++) particles.push(new Particle(f.x, f.y, f.color));
+                                for(let j=0; j<8; j++) particles.push(new Particle(f.x, f.y, f.color));
                             }
                             fruits.splice(i, 1);
                         }
@@ -343,60 +392,50 @@
             }
         }
 
-        function triggerVictoryEffect() {
-            // Suara Kemenangan "Ta-da!"
-            playTone(523.25, 0.2, "square", 0.1);
-            setTimeout(() => playTone(659.25, 0.2, "square", 0.1), 150);
-            setTimeout(() => playTone(783.99, 0.5, "square", 0.1), 300);
-            
-            // Generate Confetti
-            for(let i=0; i<100; i++) confetti.push(new Confetti());
-        }
-
         function drawGameOver() {
-            canvasCtx.fillStyle = "rgba(15, 23, 42, 0.85)";
+            canvasCtx.fillStyle = "rgba(15, 23, 42, 0.9)";
             canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
             
-            // Draw Confetti
-            for (let i = confetti.length - 1; i >= 0; i--) {
-                if(!confetti[i].update()) confetti.splice(i,1);
-                else confetti[i].draw();
-            }
-
             canvasCtx.textAlign = "center";
             canvasCtx.fillStyle = "white";
-            canvasCtx.font = "bold 30px Plus Jakarta Sans";
-            canvasCtx.fillText("MATCH CONCLUDED", WIDTH/2, HEIGHT/2 - 80);
+            
+            const titleSize = Math.min(WIDTH * 0.08, 40);
+            canvasCtx.font = `bold ${titleSize}px Plus Jakarta Sans`;
+            canvasCtx.fillText("MATCH FINISHED", WIDTH/2, HEIGHT/2 - 60);
 
-            let winText = score.p1 > score.p2 ? "PLAYER 1 DOMINATES!" : (score.p2 > score.p1 ? "PLAYER 2 DOMINATES!" : "ITS A TIE!");
+            let winText = score.p1 > score.p2 ? "P1 WINS!" : (score.p2 > score.p1 ? "P2 WINS!" : "DRAW!");
             let winColor = score.p1 > score.p2 ? "#FFE600" : (score.p2 > score.p1 ? "#008CFF" : "white");
 
-            canvasCtx.font = "900 60px Plus Jakarta Sans";
+            const winSize = Math.min(WIDTH * 0.15, 80);
+            canvasCtx.font = `900 ${winSize}px Plus Jakarta Sans`;
             canvasCtx.fillStyle = winColor;
-            
-            // Efek Pulsing sederhana di canvas
-            const scale = 1 + Math.sin(Date.now()/200) * 0.05;
-            canvasCtx.save();
-            canvasCtx.translate(WIDTH/2, HEIGHT/2);
-            canvasCtx.scale(scale, scale);
-            canvasCtx.fillText(winText, 0, 20);
-            canvasCtx.restore();
+            canvasCtx.fillText(winText, WIDTH/2, HEIGHT/2 + 20);
 
-            canvasCtx.font = "bold 20px Plus Jakarta Sans";
+            canvasCtx.font = `bold ${Math.min(WIDTH * 0.04, 20)}px Plus Jakarta Sans`;
             canvasCtx.fillStyle = "rgba(255,255,255,0.5)";
-            canvasCtx.fillText("TEKAN F5 UNTUK TANDING ULANG", WIDTH/2, HEIGHT/2 + 120);
+            canvasCtx.fillText("REFRESH TO REPLAY", WIDTH/2, HEIGHT/2 + 100);
         }
 
-        // Setup MediaPipe
+        // Setup MediaPipe dengan config mobile friendly
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
-        hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        
+        hands.setOptions({ 
+            maxNumHands: 2, 
+            modelComplexity: 0, // 0 = Lite (Cepat di HP), 1 = Full
+            minDetectionConfidence: 0.5, 
+            minTrackingConfidence: 0.5 
+        });
+        
         hands.onResults(onResults);
 
+        // Gunakan facingMode: 'user' untuk kamera depan HP
         const camera = new Camera(videoElement, {
             onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 1280, height: 720
+            width: 1280, // Request resolusi internal tinggi agar tracking akurat
+            height: 720,
+            facingMode: 'user'
         });
         camera.start();
     </script>
