@@ -1,0 +1,383 @@
+--- START OF FILE game.html ---
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aether Blades | Web Demo</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- MediaPipe Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #0F172A; margin: 0; overflow: hidden; }
+        #container { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        
+        video { transform: scaleX(-1); display: none; }
+        canvas { 
+            width: 100vw; height: 100vh; object-fit: cover; 
+            background: #000;
+        }
+
+        .ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 10;
+        }
+
+        .loading-overlay {
+            position: fixed; inset: 0; background: #0F172A;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100; color: white; transition: opacity 0.5s;
+        }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading" class="loading-overlay">
+        <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p class="font-bold tracking-widest animate-pulse uppercase text-sm">Menyiapkan Kamera & AI...</p>
+    </div>
+
+    <div id="container">
+        <video id="input_video"></video>
+        <canvas id="output_canvas"></canvas>
+
+        <!-- UI HUD -->
+        <div class="ui-layer p-8 flex justify-between items-start">
+            <div class="glass p-4 w-48 text-white">
+                <p class="text-[10px] font-bold opacity-50 uppercase tracking-tighter">Player 1</p>
+                <h2 id="score1" class="text-3xl font-black">0</h2>
+            </div>
+
+            <div class="text-center text-white">
+                <div id="timer-box" class="glass px-6 py-2">
+                    <h2 id="timer" class="text-2xl font-black">60s</h2>
+                </div>
+            </div>
+
+            <div class="glass p-4 w-48 text-right text-white">
+                <p class="text-[10px] font-bold opacity-50 uppercase tracking-tighter">Player 2</p>
+                <h2 id="score2" class="text-3xl font-black">0</h2>
+            </div>
+        </div>
+
+        <!-- Back Button -->
+        <a href="index.html" class="fixed bottom-8 left-8 z-50 glass px-6 py-3 text-white font-bold hover:bg-white/20 transition flex items-center gap-2 pointer-events-auto">
+            <i class="fas fa-arrow-left"></i> Keluar
+        </a>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const loading = document.getElementById('loading');
+
+        // Game Constants
+        const WIDTH = 1280;
+        const HEIGHT = 720;
+        const NET_X = WIDTH / 2;
+
+        let gameState = "MENU"; // MENU, PLAY, GAMEOVER
+        let score = { p1: 0, p2: 0 };
+        let combo = { p1: 0, p2: 0 };
+        let timer = 60;
+        let startTime = 0;
+        let fruits = [];
+        let particles = [];
+        let trails = { p1: [], p2: [] };
+
+        canvasElement.width = WIDTH;
+        canvasElement.height = HEIGHT;
+
+        // Sound System (Web Audio API)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, dur, type="sine") {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + dur);
+        }
+
+        class Fruit {
+            constructor(side) {
+                this.side = side;
+                this.radius = 40;
+                this.active = true;
+                this.isBomb = Math.random() < 0.15;
+                this.color = side === 'p1' ? '#FFE600' : '#008CFF';
+                if (this.isBomb) this.color = '#28282D';
+
+                let margin = 150;
+                if (side === 'p1') {
+                    this.x = margin + Math.random() * (NET_X - margin * 2);
+                    this.vx = 2 + Math.random() * 3;
+                } else {
+                    this.x = (NET_X + margin) + Math.random() * (NET_X - margin * 2);
+                    this.vx = -(2 + Math.random() * 3);
+                }
+
+                this.y = HEIGHT + 50;
+                this.vy = -(18 + Math.random() * 6);
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.5; // Gravity
+                return this.y < HEIGHT + 100;
+            }
+
+            draw() {
+                canvasCtx.beginPath();
+                canvasCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                canvasCtx.fillStyle = this.color;
+                canvasCtx.fill();
+                // Shine
+                canvasCtx.beginPath();
+                canvasCtx.arc(this.x - 10, this.y - 10, 8, 0, Math.PI * 2);
+                canvasCtx.fillStyle = 'rgba(255,255,255,0.4)';
+                canvasCtx.fill();
+
+                if (this.isBomb) {
+                    canvasCtx.fillStyle = 'red';
+                    canvasCtx.font = 'bold 40px Arial';
+                    canvasCtx.fillText('X', this.x - 13, this.y + 14);
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y;
+                this.color = color;
+                this.vx = (Math.random() - 0.5) * 20;
+                this.vy = (Math.random() - 0.5) * 20;
+                this.life = 1.0;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= 0.03;
+            }
+            draw() {
+                canvasCtx.globalAlpha = this.life;
+                canvasCtx.fillStyle = this.color;
+                canvasCtx.fillRect(this.x, this.y, 10, 10);
+                canvasCtx.globalAlpha = 1.0;
+            }
+        }
+
+        function onResults(results) {
+            if (loading.style.opacity !== '0') loading.style.opacity = '0';
+
+            // Draw Camera Background
+            canvasCtx.save();
+            canvasCtx.scale(-1, 1);
+            canvasCtx.translate(-WIDTH, 0);
+            canvasCtx.drawImage(results.image, 0, 0, WIDTH, HEIGHT);
+            canvasCtx.restore();
+
+            // Overlay Gelap
+            canvasCtx.fillStyle = "rgba(15, 23, 42, 0.4)";
+            canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            // Net Line
+            canvasCtx.strokeStyle = "rgba(255,255,255,0.3)";
+            canvasCtx.lineWidth = 2;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(NET_X, 0);
+            canvasCtx.lineTo(NET_X, HEIGHT);
+            canvasCtx.stroke();
+
+            let tips = { p1: null, p2: null };
+
+            if (results.multiHandLandmarks) {
+                for (const landmarks of results.multiHandLandmarks) {
+                    // Landmark 8 is Index Tip
+                    const tip = landmarks[8];
+                    const px = (1 - tip.x) * WIDTH;
+                    const py = tip.y * HEIGHT;
+                    
+                    const side = px < NET_X ? 'p1' : 'p2';
+                    tips[side] = { x: px, y: py };
+
+                    // Draw Slasher Trail
+                    trails[side].push({x: px, y: py});
+                    if (trails[side].length > 10) trails[side].shift();
+                }
+            }
+
+            // Draw Trails
+            ['p1', 'p2'].forEach(s => {
+                if (trails[s].length > 1) {
+                    canvasCtx.beginPath();
+                    canvasCtx.strokeStyle = s === 'p1' ? '#FFE600' : '#008CFF';
+                    canvasCtx.lineWidth = 8;
+                    canvasCtx.lineCap = 'round';
+                    canvasCtx.moveTo(trails[s][0].x, trails[s][0].y);
+                    for (let i = 1; i < trails[s].length; i++) {
+                        canvasCtx.lineTo(trails[s][i].x, trails[s][i].y);
+                    }
+                    canvasCtx.stroke();
+                }
+            });
+
+            if (gameState === "MENU") {
+                drawMenu(tips);
+            } else if (gameState === "PLAY") {
+                updatePlay(tips);
+            } else {
+                drawGameOver();
+            }
+        }
+
+        function drawMenu(tips) {
+            canvasCtx.fillStyle = "white";
+            canvasCtx.textAlign = "center";
+            canvasCtx.font = "800 60px Plus Jakarta Sans";
+            canvasCtx.fillText("AETHER BLADES", WIDTH/2, HEIGHT/2 - 40);
+            
+            canvasCtx.font = "bold 20px Plus Jakarta Sans";
+            canvasCtx.fillText("TEBAS LINGKARAN UNTUK MULAI", WIDTH/2, HEIGHT/2 + 100);
+
+            const cx = WIDTH/2, cy = HEIGHT/2 + 20;
+            canvasCtx.beginPath();
+            canvasCtx.arc(cx, cy, 50, 0, Math.PI*2);
+            canvasCtx.strokeStyle = "white";
+            canvasCtx.lineWidth = 3;
+            canvasCtx.stroke();
+
+            ['p1', 'p2'].forEach(s => {
+                if (tips[s]) {
+                    const dist = Math.hypot(tips[s].x - cx, tips[s].y - cy);
+                    if (dist < 50) {
+                        playTone(440, 0.1);
+                        playTone(880, 0.2);
+                        gameState = "PLAY";
+                        startTime = Date.now();
+                        score = {p1: 0, p2: 0};
+                    }
+                }
+            });
+        }
+
+        function updatePlay(tips) {
+            const elapsed = (Date.now() - startTime) / 1000;
+            timer = Math.max(0, 60 - Math.floor(elapsed));
+            document.getElementById('timer').innerText = timer + "s";
+            document.getElementById('score1').innerText = score.p1;
+            document.getElementById('score2').innerText = score.p2;
+
+            if (timer <= 0) gameState = "GAMEOVER";
+
+            // Spawn
+            if (Math.random() < 0.03 && fruits.length < 8) {
+                fruits.push(new Fruit('p1'));
+                fruits.push(new Fruit('p2'));
+            }
+
+            // Fruits logic
+            for (let i = fruits.length - 1; i >= 0; i--) {
+                const f = fruits[i];
+                if (!f.update()) {
+                    fruits.splice(i, 1);
+                    continue;
+                }
+                f.draw();
+
+                // Collision
+                ['p1', 'p2'].forEach(s => {
+                    if (tips[s]) {
+                        // Territory rule
+                        if ((s === 'p1' && f.x > NET_X) || (s === 'p2' && f.x < NET_X)) return;
+
+                        const dist = Math.hypot(tips[s].x - f.x, tips[s].y - f.y);
+                        if (dist < f.radius + 20) {
+                            handleSlice(f, s);
+                            fruits.splice(i, 1);
+                        }
+                    }
+                });
+            }
+
+            // Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function handleSlice(f, side) {
+            if (f.isBomb) {
+                playTone(100, 0.3, "sawtooth");
+                score[side] = Math.max(0, score[side] - 50);
+                for(let i=0; i<15; i++) particles.push(new Particle(f.x, f.y, 'red'));
+            } else {
+                playTone(600 + Math.random()*400, 0.05);
+                score[side] += 10;
+                for(let i=0; i<10; i++) particles.push(new Particle(f.x, f.y, f.color));
+            }
+        }
+
+        function drawGameOver() {
+            canvasCtx.fillStyle = "rgba(0,0,0,0.7)";
+            canvasCtx.fillRect(0,0,WIDTH,HEIGHT);
+            canvasCtx.fillStyle = "white";
+            canvasCtx.textAlign = "center";
+            canvasCtx.font = "bold 50px Plus Jakarta Sans";
+            canvasCtx.fillText("PERMAINAN SELESAI", WIDTH/2, HEIGHT/2 - 20);
+            
+            let winText = score.p1 > score.p2 ? "PLAYER 1 MENANG!" : (score.p2 > score.p1 ? "PLAYER 2 MENANG!" : "SERI!");
+            canvasCtx.font = "bold 30px Plus Jakarta Sans";
+            canvasCtx.fillStyle = "#00D1FF";
+            canvasCtx.fillText(winText, WIDTH/2, HEIGHT/2 + 40);
+
+            canvasCtx.font = "15px Plus Jakarta Sans";
+            canvasCtx.fillStyle = "white";
+            canvasCtx.fillText("REFRESH HALAMAN UNTUK MAIN LAGI", WIDTH/2, HEIGHT/2 + 100);
+        }
+
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 0, // 0 for lite (fastest)
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({image: videoElement});
+            },
+            width: 1280,
+            height: 720
+        });
+        camera.start();
+    </script>
+</body>
+</html>
