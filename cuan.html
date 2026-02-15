@@ -16,7 +16,7 @@
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; background: #064E3B; margin: 0; overflow: hidden; }
     canvas { width: 100vw; height: 100vh; object-fit: cover; cursor: none; }
-    .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+    .ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
 
     .glass-sultan {
       background: rgba(6, 78, 59, 0.85);
@@ -31,9 +31,11 @@
 
     .user-avatar { width: 60px; height: 60px; border-radius: 50%; border: 3px solid #FDE047; object-fit: cover; }
 
+    /* Flash */
     .flash-effect { position: fixed; inset: 0; background: white; z-index: 100; opacity: 0; pointer-events: none; }
     @keyframes do-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
 
+    /* Confetti */
     .confetti {
       position: fixed; top: -20px; z-index: 200;
       border-radius: 4px; opacity: .95; will-change: transform;
@@ -41,11 +43,10 @@
     }
     @keyframes fall { to { transform: translateY(calc(100vh + 60px)) rotate(540deg); opacity: 1; } }
 
-    /* Camera Capture Modal */
+    /* Camera Modal */
     .modal-bg { background: rgba(0,0,0,.72); }
     .cam-frame { aspect-ratio: 16 / 9; width: min(720px, 92vw); border-radius: 1.5rem; overflow: hidden; border: 2px solid rgba(255,255,255,.2); }
-    /* ✅ FIX: no mirror */
-    .cam-video { width: 100%; height: 100%; object-fit: cover; }
+    .cam-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); } /* Preview selalu mirror biar enak */
     .mini-preview { width: 90px; height: 90px; border-radius: 1.25rem; border: 2px solid #FDE047; object-fit: cover; }
 
     @media (prefers-reduced-motion: reduce){
@@ -121,8 +122,12 @@
             <i class="fas fa-bolt mr-2"></i> MODE KENTANG (ANTI LAG)
           </button>
 
+          <button id="btn-toggle-game-mirror" class="btn-interact w-full bg-white/10 hover:bg-white/15 text-white py-3 rounded-xl font-bold">
+            <i class="fas fa-right-left mr-2"></i> MIRROR GAMEPLAY: ON
+          </button>
+
           <p class="text-[11px] opacity-70 mt-2">
-            Tips: kamera paling stabil via <b>localhost/HTTPS</b> (bukan <code>file://</code>).
+            Tips: kamera paling stabil via <b>localhost/HTTPS</b>.
           </p>
         </div>
       </div>
@@ -135,7 +140,7 @@
           <div>
             <h2 class="text-2xl font-black text-yellow-400">Ambil Foto Sultan</h2>
             <p class="text-sm opacity-80 mt-1">
-              Ambil foto P1 & P2 dari kamera (opsional). Kamu bisa <b>Skip</b> juga.
+              Bergaya dulu biar foto di sertifikat nanti ganteng/cantik!
             </p>
           </div>
           <button id="btn-close-cam" class="btn-interact bg-white/10 hover:bg-white/15 px-4 py-2 rounded-xl font-bold">
@@ -171,13 +176,9 @@
 
           <div class="flex gap-2">
             <button id="btn-skip-cam" class="btn-interact bg-white/10 hover:bg-white/15 px-4 py-3 rounded-xl font-bold">Skip</button>
-            <button id="btn-continue" class="btn-interact bg-green-500 hover:bg-green-400 text-green-950 px-4 py-3 rounded-xl font-black">Lanjut & Mulai Game</button>
+            <button id="btn-continue" class="btn-interact bg-green-500 hover:bg-green-400 text-green-950 px-4 py-3 rounded-xl font-black">Lanjut Main</button>
           </div>
         </div>
-
-        <p class="text-xs opacity-75 mt-3">
-          Pastikan wajah di tengah. Foto akan dipotong <b>square</b>.
-        </p>
       </div>
     </div>
 
@@ -196,9 +197,9 @@
           </div>
 
           <div class="bg-white/10 p-4 rounded-2xl">
-            <p class="text-xs opacity-70 mb-3 font-bold tracking-widest uppercase">Preview Sertifikat (IG Story)</p>
+            <p class="text-xs opacity-70 mb-3 font-bold tracking-widest uppercase">Preview Sertifikat</p>
             <img id="cert-preview" class="w-full rounded-xl border border-white/20" alt="certificate preview" />
-            <p class="text-[11px] opacity-70 mt-2">Tip: setelah download, share ke IG Story ✨</p>
+            <p class="text-[11px] opacity-70 mt-2">Download lalu share ke IG Story ✨</p>
           </div>
         </div>
 
@@ -212,6 +213,7 @@
         </div>
       </div>
     </div>
+
   </div>
 
 <script>
@@ -225,7 +227,7 @@
   canvasElement.width = WIDTH; canvasElement.height = HEIGHT;
   canvasCtx.imageSmoothingEnabled = true;
 
-  // UI
+  // UI Elements
   const loadingEl = document.getElementById('loading');
   const menuOverlay = document.getElementById('menu-overlay');
   const camOverlay = document.getElementById('cam-overlay');
@@ -252,22 +254,25 @@
   const capP1 = document.getElementById('cap-p1');
   const capP2 = document.getElementById('cap-p2');
 
+  // CONFIGURATION
+  // GAME_MIRROR: TRUE = Seperti Cermin (Gerak Kanan -> Layar Kanan)
+  let GAME_MIRROR = true; 
+  
   // State
   let gameState = "MENU";
   let score = { p1:0, p2:0 };
   let timer = 60, startTime = 0, level = 1;
   let moneyItems = [];
 
-  // Trails ring buffer
+  // Trails
   let trails = { p1: new Array(12).fill(null), p2: new Array(12).fill(null) };
   let trailIdx = { p1:0, p2:0 };
 
-  // Performance knobs
+  // Performance
   let potato=false;
   let MAX_ITEMS=14;
   let SPAWN_PROB_BASE=0.045;
   let SHADOWS=true;
-  let TRACK_SCALE=0.55;
   let MP_INTERVAL=40;
 
   let userPhotos = { p1:null, p2:null };
@@ -292,7 +297,7 @@
     }
   }
 
-  // Audio
+  // Audio System
   let audioCtx=null;
   function ensureAudio(){
     if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
@@ -312,13 +317,14 @@
     }catch(e){}
   }
 
+  // GAME LOGIC CLASSES
   class Money{
     constructor(side){
       this.side=side;
       const r=Math.random();
       this.type = r<0.15?'BOMB':(r<0.30?'ANGPAO':(r<0.50?'RED':'BLUE'));
       this.width=110; this.height=55;
-      this.x = side==='p1' ? 50+Math.random()*(NET_X-160) : (NET_X+50)+Math.random()*(NET_X-160);
+      this.x = side==='p1' ? 60+Math.random()*(NET_X-180) : (NET_X+120)+Math.random()*(NET_X-200);
       this.y = -80;
       const lvlMult = 1 + level*(potato?0.14:0.20);
       this.vy = (2+Math.random()*4)*lvlMult;
@@ -370,7 +376,6 @@
     arr[trailIdx[side]]=pt;
   }
 
-  // ✅ FIX: warna beda P1/P2 (cyan vs orange)
   function drawTrail(side){
     const arr=trails[side];
     const color = side==='p1' ? "rgba(0,230,255,0.92)" : "rgba(255,138,0,0.92)";
@@ -400,6 +405,34 @@
   function hit(m, tip){
     const dx=tip.x-m.x, dy=tip.y-m.y;
     return (dx*dx+dy*dy) < (60*60);
+  }
+
+  function drawDividerAndZones(){
+    canvasCtx.save();
+    canvasCtx.fillStyle = "rgba(0,230,255,0.06)";
+    canvasCtx.fillRect(0, 0, NET_X, HEIGHT);
+    canvasCtx.fillStyle = "rgba(255,138,0,0.06)";
+    canvasCtx.fillRect(NET_X, 0, NET_X, HEIGHT);
+
+    canvasCtx.shadowBlur = potato ? 10 : 16;
+    canvasCtx.shadowColor = "rgba(253,224,71,0.9)";
+    canvasCtx.strokeStyle = "rgba(253,224,71,0.95)";
+    canvasCtx.lineWidth = 6;
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(NET_X, 0);
+    canvasCtx.lineTo(NET_X, HEIGHT);
+    canvasCtx.stroke();
+
+    canvasCtx.shadowBlur = 0;
+    canvasCtx.setLineDash([14, 10]);
+    canvasCtx.strokeStyle = "rgba(255,255,255,0.35)";
+    canvasCtx.lineWidth = 2;
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(NET_X, 0);
+    canvasCtx.lineTo(NET_X, HEIGHT);
+    canvasCtx.stroke();
+    canvasCtx.setLineDash([]);
+    canvasCtx.restore();
   }
 
   function startGame(){
@@ -498,7 +531,7 @@
   }
   btnDownloadCert.addEventListener('click', downloadCertificate);
 
-  // Capture photo (no mirror)
+  // Capture photo (always mirrored for selfie comfort)
   const capCanvas=document.createElement('canvas');
   capCanvas.width=256; capCanvas.height=256;
   const capCtx=capCanvas.getContext('2d');
@@ -511,7 +544,13 @@
     const sy=(vh-size)/2;
 
     capCtx.clearRect(0,0,256,256);
+    // Foto selalu mirror biar kayak ngaca
+    capCtx.save();
+    capCtx.translate(256, 0);
+    capCtx.scale(-1, 1);
     capCtx.drawImage(video, sx, sy, size, size, 0, 0, 256, 256);
+    capCtx.restore();
+
     return capCanvas.toDataURL("image/png",0.92);
   }
 
@@ -526,7 +565,7 @@
     userPhotos[player]=img;
   }
 
-  // MediaPipe
+  // MediaPipe Setup
   const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}` });
   hands.setOptions({ maxNumHands:2, modelComplexity:0, minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
 
@@ -534,24 +573,51 @@
   const mpCanvas=document.createElement('canvas');
   const mpCtx=mpCanvas.getContext('2d');
 
+  // --- MAIN LOOP ---
   hands.onResults((results)=>{
     loadingEl.style.display='none';
 
-    // ✅ FIX: draw image normal (no mirror)
-    canvasCtx.drawImage(results.image, 0, 0, WIDTH, HEIGHT);
+    // 1. Gambar Video Background
+    if (GAME_MIRROR) {
+      // Flip Horizontal (Mirror Mode)
+      canvasCtx.save();
+      canvasCtx.scale(-1, 1);
+      canvasCtx.translate(-WIDTH, 0);
+      canvasCtx.drawImage(results.image, 0, 0, WIDTH, HEIGHT);
+      canvasCtx.restore();
+    } else {
+      // Normal Mode
+      canvasCtx.drawImage(results.image, 0, 0, WIDTH, HEIGHT);
+    }
 
-    // tint
-    canvasCtx.fillStyle="rgba(6, 78, 59, 0.4)";
+    // Tint Overlay
+    canvasCtx.fillStyle="rgba(6, 78, 59, 0.38)";
     canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    // tips
+    drawDividerAndZones();
+
+    // 2. Deteksi Koordinat
     let tips={p1:null,p2:null};
     if(results.multiHandLandmarks){
       for(const landmarks of results.multiHandLandmarks){
-        const tip=landmarks[8];
-        // ✅ FIX: no (1 - x)
-        const px = tip.x * WIDTH;
+        const tip=landmarks[8]; // Index Finger Tip
+
+        // LOGIC FIX:
+        // MediaPipe membaca dari gambar RAW (Original).
+        // Jika mode Mirror ON: 
+        // - Gambar RAW sisi KIRI (x ~ 0) adalah tangan KANAN kita secara fisik.
+        // - Di layar Mirror, tangan KANAN harus muncul di KANAN layar (x ~ Width).
+        // - Maka rumusnya: (1 - x) * Width.
+        
+        let px;
+        if (GAME_MIRROR) {
+          px = (1 - tip.x) * WIDTH;
+        } else {
+          px = tip.x * WIDTH;
+        }
+
         const py = tip.y * HEIGHT;
+
         const side = px < NET_X ? 'p1' : 'p2';
         tips[side]={x:px,y:py};
         pushTrail(side,{x:px,y:py});
@@ -596,6 +662,7 @@
     }
   }
 
+  // Camera Setup
   const camera = new Camera(videoElement, {
     onFrame: async () => {
       const ts=performance.now();
@@ -606,15 +673,23 @@
       const th=Math.max(180,(HEIGHT*TRACK_SCALE)|0);
       if(mpCanvas.width!==tw||mpCanvas.height!==th){ mpCanvas.width=tw; mpCanvas.height=th; }
 
-      // ✅ FIX: no mirror
+      mpCtx.save();
+      mpCtx.clearRect(0,0,tw,th);
+      
+      // OPTIMASI: Selalu kirim gambar RAW (Asli) ke MediaPipe
+      // Kita handle pembalikannya (Mirroring) lewat koordinat matematika di 'onResults'
+      // Ini jauh lebih cepat daripada membalik canvas setiap frame.
       mpCtx.drawImage(videoElement, 0, 0, tw, th);
+      
+      mpCtx.restore();
+
       await hands.send({ image: mpCanvas });
     },
     width:1280,
     height:720
   });
 
-  // Buttons
+  // Event Listeners
   document.getElementById('btn-start').addEventListener('click', startGame);
 
   document.getElementById('btn-potato').addEventListener('click', ()=>{
@@ -625,23 +700,27 @@
     MP_INTERVAL = potato ? 55 : 40;
     SPAWN_PROB_BASE = potato ? 0.040 : 0.045;
     playTone(potato?520:980,0.08,"sine",0.08);
-    alert(potato ? "Mode Kentang aktif ✅ (lebih ringan)" : "Mode Balanced aktif ✅");
+    alert(potato ? "Mode Kentang aktif ✅" : "Mode Balanced aktif ✅");
+  });
+
+  const btnGameMirror = document.getElementById('btn-toggle-game-mirror');
+  btnGameMirror.addEventListener('click', ()=>{
+    GAME_MIRROR = !GAME_MIRROR;
+    btnGameMirror.innerHTML = `<i class="fas fa-right-left mr-2"></i> MIRROR GAMEPLAY: ${GAME_MIRROR ? "ON" : "OFF"}`;
+    playTone(GAME_MIRROR?740:520,0.07,"sine",0.08);
   });
 
   document.getElementById('btn-open-cam').addEventListener('click', async ()=>{
     camOverlay.classList.remove('hidden');
     try{
-      if(videoElement.srcObject){
-        camPreview.srcObject = videoElement.srcObject;
-        await camPreview.play();
-      } else {
+      if(!videoElement.srcObject){
         await camera.start();
-        camPreview.srcObject = videoElement.srcObject;
-        await camPreview.play();
       }
+      camPreview.srcObject = videoElement.srcObject;
+      await camPreview.play();
     }catch(e){
       console.error(e);
-      alert("Kamera gagal diakses. Coba jalankan via localhost/HTTPS dan izinkan kamera.");
+      alert("Kamera gagal diakses.");
     }
   });
 
@@ -651,22 +730,21 @@
 
   document.getElementById('btn-cap-p1').addEventListener('click', ()=>{
     ensureAudio();
-    if(!camPreview.videoWidth){ alert("Video belum siap. Tunggu 1 detik ya."); return; }
+    if(!camPreview.videoWidth){ alert("Tunggu kamera siap..."); return; }
     setPlayerPhoto('p1', captureSquareFromVideo(camPreview));
     playTone(1400,0.06,"triangle",0.08);
   });
   document.getElementById('btn-cap-p2').addEventListener('click', ()=>{
     ensureAudio();
-    if(!camPreview.videoWidth){ alert("Video belum siap. Tunggu 1 detik ya."); return; }
+    if(!camPreview.videoWidth){ alert("Tunggu kamera siap..."); return; }
     setPlayerPhoto('p2', captureSquareFromVideo(camPreview));
     playTone(1400,0.06,"triangle",0.08);
   });
 
-  // Start camera
   camera.start().catch(err=>{
     console.error(err);
     loadingEl.style.display='none';
-    alert("Kamera tidak bisa dibuka. Pastikan izin kamera, dan jalankan via localhost/HTTPS.");
+    alert("Gagal akses kamera. Pastikan via HTTPS/Localhost.");
   });
 
 })();
