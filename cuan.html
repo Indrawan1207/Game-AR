@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- MediaPipe (pin versi biar stabil) -->
+  <!-- MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.min.js" crossorigin="anonymous"></script>
 
@@ -31,38 +31,23 @@
 
     .user-avatar { width: 60px; height: 60px; border-radius: 50%; border: 3px solid #FDE047; object-fit: cover; }
 
-    /* Flash */
-    .flash-effect {
-      position: fixed; inset: 0; background: white; z-index: 100;
-      opacity: 0; pointer-events: none;
-    }
-    @keyframes do-flash {
-      0% { opacity: 1; }
-      100% { opacity: 0; }
-    }
+    .flash-effect { position: fixed; inset: 0; background: white; z-index: 100; opacity: 0; pointer-events: none; }
+    @keyframes do-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
 
-    /* Confetti (DOM lightweight) */
     .confetti {
-      position: fixed;
-      width: 10px; height: 14px;
-      top: -20px;
-      z-index: 200;
-      border-radius: 4px;
-      opacity: .95;
-      will-change: transform;
+      position: fixed; top: -20px; z-index: 200;
+      border-radius: 4px; opacity: .95; will-change: transform;
       animation: fall 1200ms linear forwards;
     }
-    @keyframes fall {
-      to { transform: translateY(calc(100vh + 60px)) rotate(540deg); opacity: 1; }
-    }
+    @keyframes fall { to { transform: translateY(calc(100vh + 60px)) rotate(540deg); opacity: 1; } }
 
     /* Camera Capture Modal */
     .modal-bg { background: rgba(0,0,0,.72); }
     .cam-frame { aspect-ratio: 16 / 9; width: min(720px, 92vw); border-radius: 1.5rem; overflow: hidden; border: 2px solid rgba(255,255,255,.2); }
-    .cam-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    /* ✅ FIX: no mirror */
+    .cam-video { width: 100%; height: 100%; object-fit: cover; }
     .mini-preview { width: 90px; height: 90px; border-radius: 1.25rem; border: 2px solid #FDE047; object-fit: cover; }
 
-    /* Reduce motion support */
     @media (prefers-reduced-motion: reduce){
       .confetti { animation: none; display:none; }
     }
@@ -77,7 +62,6 @@
     <p class="font-bold tracking-widest text-yellow-400">MEMUAT SISTEM SULTAN...</p>
   </div>
 
-  <!-- MAIN -->
   <div id="container" class="relative">
     <video id="input_video" class="hidden" playsinline></video>
     <canvas id="output_canvas"></canvas>
@@ -186,16 +170,12 @@
           </div>
 
           <div class="flex gap-2">
-            <button id="btn-skip-cam" class="btn-interact bg-white/10 hover:bg-white/15 px-4 py-3 rounded-xl font-bold">
-              Skip
-            </button>
-            <button id="btn-continue" class="btn-interact bg-green-500 hover:bg-green-400 text-green-950 px-4 py-3 rounded-xl font-black">
-              Lanjut & Mulai Game
-            </button>
+            <button id="btn-skip-cam" class="btn-interact bg-white/10 hover:bg-white/15 px-4 py-3 rounded-xl font-bold">Skip</button>
+            <button id="btn-continue" class="btn-interact bg-green-500 hover:bg-green-400 text-green-950 px-4 py-3 rounded-xl font-black">Lanjut & Mulai Game</button>
           </div>
         </div>
 
-        <p id="cam-hint" class="text-xs opacity-75 mt-3">
+        <p class="text-xs opacity-75 mt-3">
           Pastikan wajah di tengah. Foto akan dipotong <b>square</b>.
         </p>
       </div>
@@ -241,15 +221,11 @@
   const canvasCtx = canvasElement.getContext('2d', { alpha: false, desynchronized: true });
   const flash = document.getElementById('flash');
 
-  const WIDTH = 1280;
-  const HEIGHT = 720;
-  const NET_X = WIDTH / 2;
-
-  canvasElement.width = WIDTH;
-  canvasElement.height = HEIGHT;
+  const WIDTH = 1280, HEIGHT = 720, NET_X = WIDTH/2;
+  canvasElement.width = WIDTH; canvasElement.height = HEIGHT;
   canvasCtx.imageSmoothingEnabled = true;
 
-  // UI refs
+  // UI
   const loadingEl = document.getElementById('loading');
   const menuOverlay = document.getElementById('menu-overlay');
   const camOverlay = document.getElementById('cam-overlay');
@@ -267,178 +243,165 @@
   const certPreviewEl = document.getElementById('cert-preview');
   const btnDownloadCert = document.getElementById('btn-download-cert');
 
-  // preview & avatars
   const previewP1 = document.getElementById('preview-p1');
   const previewP2 = document.getElementById('preview-p2');
   const avatarP1 = document.getElementById('avatar-p1');
   const avatarP2 = document.getElementById('avatar-p2');
 
-  // Camera capture modal elements
   const camPreview = document.getElementById('cam_preview');
   const capP1 = document.getElementById('cap-p1');
   const capP2 = document.getElementById('cap-p2');
 
-  // Game state
+  // State
   let gameState = "MENU";
-  let score = { p1: 0, p2: 0 };
-  let timer = 60;
-  let startTime = 0;
+  let score = { p1:0, p2:0 };
+  let timer = 60, startTime = 0, level = 1;
   let moneyItems = [];
+
+  // Trails ring buffer
   let trails = { p1: new Array(12).fill(null), p2: new Array(12).fill(null) };
-  let trailIdx = { p1: 0, p2: 0 };
-  let level = 1;
+  let trailIdx = { p1:0, p2:0 };
 
   // Performance knobs
-  let potato = false;
-  let MAX_ITEMS = 14;          // max money objects total
-  let SPAWN_PROB_BASE = 0.045; // baseline spawn chance
-  let SHADOWS = true;          // shadow cost
-  let TRACK_SCALE = 0.55;      // downscale for mediapipe
-  let MP_INTERVAL = 40;        // ms throttle
+  let potato=false;
+  let MAX_ITEMS=14;
+  let SPAWN_PROB_BASE=0.045;
+  let SHADOWS=true;
+  let TRACK_SCALE=0.55;
+  let MP_INTERVAL=40;
 
-  // User photos (Image objects)
-  let userPhotos = { p1: null, p2: null };
+  let userPhotos = { p1:null, p2:null };
   let certDataUrl = null;
 
-  // --- UTILS ---
-  function formatRupiah(num) { return "Rp " + (num|0).toLocaleString('id-ID'); }
+  function formatRupiah(num){ return "Rp " + (num|0).toLocaleString('id-ID'); }
 
-  // Simple lightweight confetti
-  function launchConfetti() {
-    const colors = ["#FDE047","#34D399","#60A5FA","#FB7185","#A78BFA"];
+  // Confetti
+  function launchConfetti(){
+    const colors=["#FDE047","#34D399","#60A5FA","#FB7185","#A78BFA"];
     const n = potato ? 50 : 120;
-    for (let i = 0; i < n; i++) {
-      const d = document.createElement('div');
-      d.className = 'confetti';
-      d.style.left = (Math.random() * 100) + 'vw';
-      d.style.background = colors[(Math.random()*colors.length)|0];
-      d.style.transform = `translateY(0) rotate(${Math.random()*360}deg)`;
-      d.style.animationDuration = (900 + Math.random()*700) + 'ms';
-      d.style.width = (6 + Math.random()*10) + 'px';
-      d.style.height = (10 + Math.random()*14) + 'px';
+    for(let i=0;i<n;i++){
+      const d=document.createElement('div');
+      d.className='confetti';
+      d.style.left=(Math.random()*100)+'vw';
+      d.style.background=colors[(Math.random()*colors.length)|0];
+      d.style.animationDuration=(900+Math.random()*700)+'ms';
+      d.style.width=(6+Math.random()*10)+'px';
+      d.style.height=(10+Math.random()*14)+'px';
       document.body.appendChild(d);
-      setTimeout(() => d.remove(), 1700);
+      setTimeout(()=>d.remove(),1700);
     }
   }
 
-  // --- AUDIO (safe init) ---
-  let audioCtx = null;
+  // Audio
+  let audioCtx=null;
   function ensureAudio(){
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
   }
-  function playTone(freq, dur, type="sine", vol=0.08) {
+  function playTone(freq,dur,type="sine",vol=0.08){
     try{
       ensureAudio();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-      gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+      const osc=audioCtx.createOscillator();
+      const gain=audioCtx.createGain();
+      osc.type=type;
+      osc.frequency.setValueAtTime(freq,audioCtx.currentTime);
+      gain.gain.setValueAtTime(vol,audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+dur);
       osc.connect(gain); gain.connect(audioCtx.destination);
-      osc.start(); osc.stop(audioCtx.currentTime + dur);
+      osc.start(); osc.stop(audioCtx.currentTime+dur);
     }catch(e){}
   }
 
-  // --- Money class (no particles to keep smooth) ---
-  class Money {
-    constructor(side) {
-      this.side = side;
-      const r = Math.random();
-      this.type = r < 0.15 ? 'BOMB' : (r < 0.30 ? 'ANGPAO' : (r < 0.50 ? 'RED' : 'BLUE'));
-
-      this.width = 110;
-      this.height = 55;
-      this.x = side === 'p1'
-        ? 50 + Math.random() * (NET_X - 160)
-        : (NET_X + 50) + Math.random() * (NET_X - 160);
+  class Money{
+    constructor(side){
+      this.side=side;
+      const r=Math.random();
+      this.type = r<0.15?'BOMB':(r<0.30?'ANGPAO':(r<0.50?'RED':'BLUE'));
+      this.width=110; this.height=55;
+      this.x = side==='p1' ? 50+Math.random()*(NET_X-160) : (NET_X+50)+Math.random()*(NET_X-160);
       this.y = -80;
-
-      // speed scales with level (capped by potato)
-      const lvlMult = 1 + level * (potato ? 0.14 : 0.20);
-      this.vy = (2 + Math.random() * 4) * lvlMult;
-      this.vx = Math.sin(Math.random() * 5) * 2;
-      this.angle = 0;
+      const lvlMult = 1 + level*(potato?0.14:0.20);
+      this.vy = (2+Math.random()*4)*lvlMult;
+      this.vx = Math.sin(Math.random()*5)*2;
+      this.angle=0;
     }
-    update() {
-      this.y += this.vy;
-      this.x += this.vx;
-      this.angle += 0.05;
-      return this.y < HEIGHT + 120;
+    update(){
+      this.y+=this.vy; this.x+=this.vx; this.angle+=0.05;
+      return this.y < HEIGHT+120;
     }
-    draw() {
+    draw(){
       canvasCtx.save();
-      canvasCtx.translate(this.x, this.y);
-      canvasCtx.rotate(Math.sin(this.angle) * 0.3);
+      canvasCtx.translate(this.x,this.y);
+      canvasCtx.rotate(Math.sin(this.angle)*0.3);
 
-      if (SHADOWS) {
-        canvasCtx.shadowBlur = potato ? 6 : 10;
+      if(SHADOWS){
+        canvasCtx.shadowBlur = potato?6:10;
         canvasCtx.shadowColor = "rgba(0,0,0,0.3)";
-      } else {
-        canvasCtx.shadowBlur = 0;
-      }
+      } else canvasCtx.shadowBlur=0;
 
-      if(this.type === 'BOMB') {
-        canvasCtx.fillStyle = "#333";
-        canvasCtx.beginPath(); canvasCtx.arc(0,0, 30, 0, Math.PI*2); canvasCtx.fill();
-        canvasCtx.fillStyle = "white"; canvasCtx.font = "bold 20px Arial"; canvasCtx.fillText("💥", -15, 8);
-      } else if(this.type === 'ANGPAO') {
-        canvasCtx.fillStyle = "#D4AF37";
-        canvasCtx.fillRect(-30, -40, 60, 80);
-        canvasCtx.strokeStyle = "white"; canvasCtx.strokeRect(-25, -35, 50, 70);
-        canvasCtx.fillStyle = "white"; canvasCtx.font = "bold 25px Arial"; canvasCtx.fillText("🧧", -15, 10);
+      if(this.type==='BOMB'){
+        canvasCtx.fillStyle="#333";
+        canvasCtx.beginPath(); canvasCtx.arc(0,0,30,0,Math.PI*2); canvasCtx.fill();
+        canvasCtx.fillStyle="white"; canvasCtx.font="bold 20px Arial"; canvasCtx.fillText("💥",-15,8);
+      } else if(this.type==='ANGPAO'){
+        canvasCtx.fillStyle="#D4AF37";
+        canvasCtx.fillRect(-30,-40,60,80);
+        canvasCtx.strokeStyle="white"; canvasCtx.strokeRect(-25,-35,50,70);
+        canvasCtx.fillStyle="white"; canvasCtx.font="bold 25px Arial"; canvasCtx.fillText("🧧",-15,10);
       } else {
-        canvasCtx.fillStyle = this.type === 'RED' ? "#EF4444" : "#3B82F6";
-        canvasCtx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
-        canvasCtx.strokeStyle = "rgba(255,255,255,0.4)";
-        canvasCtx.lineWidth = 3;
-        canvasCtx.strokeRect(-this.width/2 + 5, -this.height/2 + 5, this.width - 10, this.height - 10);
-        canvasCtx.fillStyle = "white";
-        canvasCtx.font = "bold 16px Courier New";
-        canvasCtx.fillText(this.type === 'RED' ? "100.000" : "50.000", -40, 5);
+        canvasCtx.fillStyle = this.type==='RED' ? "#EF4444" : "#3B82F6";
+        canvasCtx.fillRect(-this.width/2,-this.height/2,this.width,this.height);
+        canvasCtx.strokeStyle="rgba(255,255,255,0.4)";
+        canvasCtx.lineWidth=3;
+        canvasCtx.strokeRect(-this.width/2+5,-this.height/2+5,this.width-10,this.height-10);
+        canvasCtx.fillStyle="white";
+        canvasCtx.font="bold 16px Courier New";
+        canvasCtx.fillText(this.type==='RED'?"100.000":"50.000",-40,5);
       }
 
       canvasCtx.restore();
-      canvasCtx.shadowBlur = 0;
+      canvasCtx.shadowBlur=0;
     }
   }
 
-  // --- Trails (ring buffer) ---
   function pushTrail(side, pt){
-    const arr = trails[side];
-    trailIdx[side] = (trailIdx[side] + 1) % arr.length;
-    arr[trailIdx[side]] = pt;
+    const arr=trails[side];
+    trailIdx[side]=(trailIdx[side]+1)%arr.length;
+    arr[trailIdx[side]]=pt;
   }
+
+  // ✅ FIX: warna beda P1/P2 (cyan vs orange)
   function drawTrail(side){
-    const arr = trails[side];
-    // draw from oldest to newest
-    let last = null;
-    canvasCtx.strokeStyle = "#FDE047";
-    canvasCtx.lineCap = 'round';
+    const arr=trails[side];
+    const color = side==='p1' ? "rgba(0,230,255,0.92)" : "rgba(255,138,0,0.92)";
+    canvasCtx.strokeStyle=color;
+    canvasCtx.lineCap='round';
     canvasCtx.beginPath();
 
+    let last=null;
     for(let i=0;i<arr.length;i++){
-      const idx = (trailIdx[side] + 1 + i) % arr.length;
-      const p = arr[idx];
+      const idx=(trailIdx[side]+1+i)%arr.length;
+      const p=arr[idx];
       if(!p){ last=null; continue; }
-      if(!last){ canvasCtx.moveTo(p.x, p.y); }
-      else { canvasCtx.lineTo(p.x, p.y); }
-      last = p;
+      if(!last) canvasCtx.moveTo(p.x,p.y);
+      else canvasCtx.lineTo(p.x,p.y);
+      last=p;
     }
 
-    canvasCtx.lineWidth = potato ? 10 : 15;
+    if(!potato){
+      canvasCtx.shadowBlur=18;
+      canvasCtx.shadowColor=color;
+    }
+    canvasCtx.lineWidth = potato?10:15;
     canvasCtx.stroke();
+    canvasCtx.shadowBlur=0;
   }
 
-  // --- Collision (distance squared) ---
   function hit(m, tip){
-    const dx = tip.x - m.x;
-    const dy = tip.y - m.y;
-    return (dx*dx + dy*dy) < (60*60);
+    const dx=tip.x-m.x, dy=tip.y-m.y;
+    return (dx*dx+dy*dy) < (60*60);
   }
 
-  // --- Game flow ---
   function startGame(){
     ensureAudio();
     menuOverlay.classList.add('hidden');
@@ -446,348 +409,263 @@
     gameHud.classList.remove('hidden');
     resultOverlay.classList.add('hidden');
 
-    gameState = "PLAY";
-    score.p1 = 0; score.p2 = 0;
-    moneyItems.length = 0;
+    gameState="PLAY";
+    score.p1=0; score.p2=0;
+    moneyItems.length=0;
     trails.p1.fill(null); trails.p2.fill(null);
-    trailIdx.p1 = 0; trailIdx.p2 = 0;
+    trailIdx.p1=0; trailIdx.p2=0;
 
-    timer = 60;
-    level = 1;
-    startTime = Date.now();
-
-    // tiny start sfx
-    playTone(800, 0.06); setTimeout(()=>playTone(1200,0.08), 70);
+    timer=60; level=1; startTime=Date.now();
+    playTone(800,0.06); setTimeout(()=>playTone(1200,0.08),70);
   }
 
   function handleCatch(m, side){
-    if (m.type === 'BOMB') {
-      playTone(100, 0.45, "sawtooth", 0.22);
-      score[side] = Math.max(0, score[side] - 150000);
-    } else if (m.type === 'ANGPAO') {
-      playTone(1200, 0.08, "sine", 0.10);
-      playTone(1500, 0.12, "sine", 0.10);
-      const bonus = ((Math.random() * 5) | 0 + 1) * 50000;
-      score[side] += bonus;
+    if(m.type==='BOMB'){
+      playTone(100,0.45,"sawtooth",0.22);
+      score[side]=Math.max(0, score[side]-150000);
+    } else if(m.type==='ANGPAO'){
+      playTone(1200,0.08,"sine",0.10);
+      playTone(1500,0.12,"sine",0.10);
+      const bonus=((Math.random()*5)|0+1)*50000;
+      score[side]+=bonus;
     } else {
-      playTone(950, 0.05, "triangle", 0.09);
-      score[side] += (m.type === 'RED' ? 100000 : 50000);
+      playTone(950,0.05,"triangle",0.09);
+      score[side]+= (m.type==='RED'?100000:50000);
     }
   }
 
   function endGame(){
-    gameState = "RESULT";
-    flash.style.animation = "do-flash 0.5s forwards";
+    gameState="RESULT";
+    flash.style.animation="do-flash 0.5s forwards";
     launchConfetti();
-
     gameHud.classList.add('hidden');
     resultOverlay.classList.remove('hidden');
 
-    const winText = score.p1 > score.p2 ? "PLAYER 1 PALING SULTAN!" : (score.p2 > score.p1 ? "PLAYER 2 PALING SULTAN!" : "KITA SEMUA SULTAN!");
+    const winText = score.p1>score.p2 ? "PLAYER 1 PALING SULTAN!" : (score.p2>score.p1 ? "PLAYER 2 PALING SULTAN!" : "KITA SEMUA SULTAN!");
     winnerTextEl.innerText = winText;
-
     finalScore1El.innerText = formatRupiah(score.p1);
     finalScore2El.innerText = formatRupiah(score.p2);
 
-    // Generate certificate ONCE, then show preview + download uses cached url
     certDataUrl = renderCertificateDataURL();
     certPreviewEl.src = certDataUrl;
   }
 
-  // --- Certificate render (returns dataURL) ---
-  function renderCertificateDataURL() {
-    const certCanvas = document.createElement('canvas');
-    certCanvas.width = 1080;
-    certCanvas.height = 1920;
-    const ctx = certCanvas.getContext('2d');
+  function renderCertificateDataURL(){
+    const certCanvas=document.createElement('canvas');
+    certCanvas.width=1080; certCanvas.height=1920;
+    const ctx=certCanvas.getContext('2d');
 
-    ctx.fillStyle = "#064E3B";
-    ctx.fillRect(0, 0, 1080, 1920);
+    ctx.fillStyle="#064E3B"; ctx.fillRect(0,0,1080,1920);
+    ctx.strokeStyle="#FDE047"; ctx.lineWidth=40; ctx.strokeRect(40,40,1000,1840);
 
-    // frame
-    ctx.strokeStyle = "#FDE047";
-    ctx.lineWidth = 40;
-    ctx.strokeRect(40, 40, 1000, 1840);
+    ctx.fillStyle="#FDE047"; ctx.textAlign="center";
+    ctx.font="bold 80px Arial"; ctx.fillText("SERTIFIKAT SULTAN",540,300);
+    ctx.font="40px Arial"; ctx.fillText("EDISI LEBARAN 2025",540,370);
 
-    // title
-    ctx.fillStyle = "#FDE047";
-    ctx.textAlign = "center";
-    ctx.font = "bold 80px Arial";
-    ctx.fillText("SERTIFIKAT SULTAN", 540, 300);
-    ctx.font = "40px Arial";
-    ctx.fillText("EDISI LEBARAN 2025", 540, 370);
+    const winner = score.p1>=score.p2?'p1':'p2';
+    const winnerPhoto=userPhotos[winner];
 
-    // winner
-    const winner = score.p1 >= score.p2 ? 'p1' : 'p2';
-    const winnerPhoto = userPhotos[winner];
-
-    // photo circle
-    if(winnerPhoto) {
+    if(winnerPhoto){
       ctx.save();
-      ctx.beginPath(); ctx.arc(540, 700, 250, 0, Math.PI*2); ctx.clip();
-      ctx.drawImage(winnerPhoto, 290, 450, 500, 500);
+      ctx.beginPath(); ctx.arc(540,700,250,0,Math.PI*2); ctx.clip();
+      ctx.drawImage(winnerPhoto,290,450,500,500);
       ctx.restore();
     } else {
-      // fallback badge
-      ctx.fillStyle = "rgba(255,255,255,0.08)";
-      ctx.beginPath(); ctx.arc(540, 700, 250, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = "#FDE047";
-      ctx.font = "bold 90px Arial";
-      ctx.fillText(winner === 'p1' ? "P1" : "P2", 540, 720);
+      ctx.fillStyle="rgba(255,255,255,0.08)";
+      ctx.beginPath(); ctx.arc(540,700,250,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#FDE047"; ctx.font="bold 90px Arial";
+      ctx.fillText(winner==='p1'?'P1':'P2',540,720);
     }
 
-    // score text
-    ctx.font = "bold 60px Arial";
-    ctx.fillStyle = "white";
-    ctx.fillText(winner === 'p1' ? "PLAYER 1" : "PLAYER 2", 540, 1050);
+    ctx.font="bold 60px Arial"; ctx.fillStyle="white";
+    ctx.fillText(winner==='p1'?"PLAYER 1":"PLAYER 2",540,1050);
 
-    ctx.font = "bold 120px Arial";
-    ctx.fillStyle = "#FDE047";
-    ctx.fillText(formatRupiah(score[winner]), 540, 1200);
+    ctx.font="bold 120px Arial"; ctx.fillStyle="#FDE047";
+    ctx.fillText(formatRupiah(score[winner]),540,1200);
 
-    ctx.font = "30px Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.fillText("Dibuat dengan Aether Sultan AR", 540, 1800);
+    ctx.font="30px Arial"; ctx.fillStyle="rgba(255,255,255,0.5)";
+    ctx.fillText("Dibuat dengan Aether Sultan AR",540,1800);
 
-    return certCanvas.toDataURL("image/png", 0.92);
+    return certCanvas.toDataURL("image/png",0.92);
   }
 
   function downloadCertificate(){
     if(!certDataUrl) certDataUrl = renderCertificateDataURL();
-    const link = document.createElement('a');
-    link.download = 'Sertifikat_Sultan_THR.png';
-    link.href = certDataUrl;
+    const link=document.createElement('a');
+    link.download='Sertifikat_Sultan_THR.png';
+    link.href=certDataUrl;
     link.click();
   }
-
   btnDownloadCert.addEventListener('click', downloadCertificate);
 
-  // --- Camera capture flow (use same stream) ---
-  const capCanvas = document.createElement('canvas');
-  capCanvas.width = 256;
-  capCanvas.height = 256;
-  const capCtx = capCanvas.getContext('2d');
+  // Capture photo (no mirror)
+  const capCanvas=document.createElement('canvas');
+  capCanvas.width=256; capCanvas.height=256;
+  const capCtx=capCanvas.getContext('2d');
 
   function captureSquareFromVideo(video){
-    // crop square from center of video frame
-    const vw = video.videoWidth || 1280;
-    const vh = video.videoHeight || 720;
-    const size = Math.min(vw, vh);
-    const sx = (vw - size) / 2;
-    const sy = (vh - size) / 2;
+    const vw=video.videoWidth||1280;
+    const vh=video.videoHeight||720;
+    const size=Math.min(vw,vh);
+    const sx=(vw-size)/2;
+    const sy=(vh-size)/2;
 
-    // mirror horizontally (like preview)
-    capCtx.save();
     capCtx.clearRect(0,0,256,256);
-    capCtx.translate(256,0);
-    capCtx.scale(-1,1);
     capCtx.drawImage(video, sx, sy, size, size, 0, 0, 256, 256);
-    capCtx.restore();
-
-    return capCanvas.toDataURL("image/png", 0.92);
+    return capCanvas.toDataURL("image/png",0.92);
   }
 
   function setPlayerPhoto(player, dataUrl){
-    // Update UI
-    if(player === 'p1'){
-      previewP1.src = dataUrl;
-      avatarP1.src = dataUrl;
-      capP1.src = dataUrl;
+    if(player==='p1'){
+      previewP1.src=dataUrl; avatarP1.src=dataUrl; capP1.src=dataUrl;
     } else {
-      previewP2.src = dataUrl;
-      avatarP2.src = dataUrl;
-      capP2.src = dataUrl;
+      previewP2.src=dataUrl; avatarP2.src=dataUrl; capP2.src=dataUrl;
     }
-
-    // store as Image
-    const img = new Image();
-    img.src = dataUrl;
-    userPhotos[player] = img;
+    const img=new Image();
+    img.src=dataUrl;
+    userPhotos[player]=img;
   }
 
-  // --- MediaPipe pipeline with downscale + throttle ---
+  // MediaPipe
   const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}` });
-  hands.setOptions({
-    maxNumHands: 2,
-    modelComplexity: 0,
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5
-  });
+  hands.setOptions({ maxNumHands:2, modelComplexity:0, minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
 
-  let lastMp = 0;
+  let lastMp=0;
+  const mpCanvas=document.createElement('canvas');
+  const mpCtx=mpCanvas.getContext('2d');
 
-  // downscale canvas sent to mediapipe
-  const mpCanvas = document.createElement('canvas');
-  const mpCtx = mpCanvas.getContext('2d');
+  hands.onResults((results)=>{
+    loadingEl.style.display='none';
 
-  hands.onResults((results) => {
-    loadingEl.style.display = 'none';
-
-    // draw camera image as background
-    canvasCtx.save();
-    canvasCtx.scale(-1, 1);
-    canvasCtx.translate(-WIDTH, 0);
+    // ✅ FIX: draw image normal (no mirror)
     canvasCtx.drawImage(results.image, 0, 0, WIDTH, HEIGHT);
-    canvasCtx.restore();
 
-    // green tint overlay
-    canvasCtx.fillStyle = "rgba(6, 78, 59, 0.4)";
+    // tint
+    canvasCtx.fillStyle="rgba(6, 78, 59, 0.4)";
     canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
 
     // tips
-    let tips = { p1: null, p2: null };
-    if (results.multiHandLandmarks) {
-      for (const landmarks of results.multiHandLandmarks) {
-        const tip = landmarks[8];
-        const px = (1 - tip.x) * WIDTH;
+    let tips={p1:null,p2:null};
+    if(results.multiHandLandmarks){
+      for(const landmarks of results.multiHandLandmarks){
+        const tip=landmarks[8];
+        // ✅ FIX: no (1 - x)
+        const px = tip.x * WIDTH;
         const py = tip.y * HEIGHT;
         const side = px < NET_X ? 'p1' : 'p2';
-        tips[side] = { x: px, y: py };
-        pushTrail(side, { x: px, y: py });
+        tips[side]={x:px,y:py};
+        pushTrail(side,{x:px,y:py});
       }
     }
 
-    // trails render
-    if (tips.p1) drawTrail('p1');
-    if (tips.p2) drawTrail('p2');
+    if(tips.p1) drawTrail('p1');
+    if(tips.p2) drawTrail('p2');
 
-    // play update
-    if (gameState === "PLAY") updatePlay(tips);
+    if(gameState==="PLAY") updatePlay(tips);
   });
 
-  function updatePlay(tips) {
-    const now = Date.now();
-
-    const newTimer = Math.max(0, 60 - ((now - startTime) / 1000 | 0));
-    if (newTimer !== timer) {
-      timer = newTimer;
-      level = 1 + (((60 - timer) / 15) | 0);
-      timerEl.innerText = timer;
-      levelEl.innerText = "LV " + level;
-      if (timer <= 0) { endGame(); return; }
+  function updatePlay(tips){
+    const now=Date.now();
+    const newTimer=Math.max(0, 60-(((now-startTime)/1000)|0));
+    if(newTimer!==timer){
+      timer=newTimer;
+      level=1+(((60-timer)/15)|0);
+      timerEl.innerText=timer;
+      levelEl.innerText="LV "+level;
+      if(timer<=0){ endGame(); return; }
     }
 
-    // UI update throttled
-    if ((now % 200) < 18) {
-      score1El.innerText = formatRupiah(score.p1);
-      score2El.innerText = formatRupiah(score.p2);
+    if((now%200)<18){
+      score1El.innerText=formatRupiah(score.p1);
+      score2El.innerText=formatRupiah(score.p2);
     }
 
-    // spawn (prob scales with level but capped)
-    const spawnProb = Math.min(0.085, SPAWN_PROB_BASE + (level * (potato ? 0.006 : 0.01)));
-    if (Math.random() < spawnProb && moneyItems.length < MAX_ITEMS) {
+    const spawnProb=Math.min(0.085, SPAWN_PROB_BASE+(level*(potato?0.006:0.01)));
+    if(Math.random()<spawnProb && moneyItems.length<MAX_ITEMS){
       moneyItems.push(new Money('p1'));
       moneyItems.push(new Money('p2'));
     }
 
-    // update & draw items
-    for (let i = moneyItems.length - 1; i >= 0; i--) {
-      const m = moneyItems[i];
-      if (!m.update()) { moneyItems.splice(i, 1); continue; }
+    for(let i=moneyItems.length-1;i>=0;i--){
+      const m=moneyItems[i];
+      if(!m.update()){ moneyItems.splice(i,1); continue; }
       m.draw();
 
-      // collision check only for matching side tips
-      if (m.side === 'p1' && tips.p1 && hit(m, tips.p1)) {
-        handleCatch(m, 'p1');
-        moneyItems.splice(i, 1);
-        continue;
-      }
-      if (m.side === 'p2' && tips.p2 && hit(m, tips.p2)) {
-        handleCatch(m, 'p2');
-        moneyItems.splice(i, 1);
-        continue;
-      }
+      if(m.side==='p1' && tips.p1 && hit(m,tips.p1)){ handleCatch(m,'p1'); moneyItems.splice(i,1); continue; }
+      if(m.side==='p2' && tips.p2 && hit(m,tips.p2)){ handleCatch(m,'p2'); moneyItems.splice(i,1); continue; }
     }
   }
 
-  // Start camera + mediapipe camera utils
   const camera = new Camera(videoElement, {
     onFrame: async () => {
-      const ts = performance.now();
-      if (ts - lastMp < MP_INTERVAL) return;
-      lastMp = ts;
+      const ts=performance.now();
+      if(ts-lastMp<MP_INTERVAL) return;
+      lastMp=ts;
 
-      // downscale before send
-      const tw = Math.max(320, (WIDTH * TRACK_SCALE) | 0);
-      const th = Math.max(180, (HEIGHT * TRACK_SCALE) | 0);
-      if (mpCanvas.width !== tw || mpCanvas.height !== th) {
-        mpCanvas.width = tw; mpCanvas.height = th;
-      }
+      const tw=Math.max(320,(WIDTH*TRACK_SCALE)|0);
+      const th=Math.max(180,(HEIGHT*TRACK_SCALE)|0);
+      if(mpCanvas.width!==tw||mpCanvas.height!==th){ mpCanvas.width=tw; mpCanvas.height=th; }
 
-      // mirror same direction (so coordinate remains consistent)
-      mpCtx.save();
-      mpCtx.scale(-1, 1);
-      mpCtx.drawImage(videoElement, -tw, 0, tw, th);
-      mpCtx.restore();
-
+      // ✅ FIX: no mirror
+      mpCtx.drawImage(videoElement, 0, 0, tw, th);
       await hands.send({ image: mpCanvas });
     },
-    width: 1280,
-    height: 720
+    width:1280,
+    height:720
   });
 
-  // --- Buttons / UX ---
+  // Buttons
   document.getElementById('btn-start').addEventListener('click', startGame);
 
-  document.getElementById('btn-potato').addEventListener('click', () => {
-    potato = !potato;
-
-    // tune knobs
+  document.getElementById('btn-potato').addEventListener('click', ()=>{
+    potato=!potato;
     MAX_ITEMS = potato ? 10 : 14;
     SHADOWS = !potato;
     TRACK_SCALE = potato ? 0.45 : 0.55;
     MP_INTERVAL = potato ? 55 : 40;
     SPAWN_PROB_BASE = potato ? 0.040 : 0.045;
-
-    // feedback sound
-    playTone(potato ? 520 : 980, 0.08, "sine", 0.08);
+    playTone(potato?520:980,0.08,"sine",0.08);
     alert(potato ? "Mode Kentang aktif ✅ (lebih ringan)" : "Mode Balanced aktif ✅");
   });
 
-  document.getElementById('btn-open-cam').addEventListener('click', async () => {
+  document.getElementById('btn-open-cam').addEventListener('click', async ()=>{
     camOverlay.classList.remove('hidden');
-
-    // preview uses same stream as mediapipe videoElement
     try{
-      // if camera already started, just attach
-      if (videoElement.srcObject) {
+      if(videoElement.srcObject){
         camPreview.srcObject = videoElement.srcObject;
         await camPreview.play();
       } else {
-        // start camera once (camera_utils uses getUserMedia internally when camera.start())
         await camera.start();
         camPreview.srcObject = videoElement.srcObject;
         await camPreview.play();
       }
-    } catch(e){
+    }catch(e){
       console.error(e);
       alert("Kamera gagal diakses. Coba jalankan via localhost/HTTPS dan izinkan kamera.");
     }
   });
 
-  document.getElementById('btn-close-cam').addEventListener('click', () => camOverlay.classList.add('hidden'));
-  document.getElementById('btn-skip-cam').addEventListener('click', () => { camOverlay.classList.add('hidden'); startGame(); });
-  document.getElementById('btn-continue').addEventListener('click', () => { camOverlay.classList.add('hidden'); startGame(); });
+  document.getElementById('btn-close-cam').addEventListener('click', ()=>camOverlay.classList.add('hidden'));
+  document.getElementById('btn-skip-cam').addEventListener('click', ()=>{ camOverlay.classList.add('hidden'); startGame(); });
+  document.getElementById('btn-continue').addEventListener('click', ()=>{ camOverlay.classList.add('hidden'); startGame(); });
 
-  document.getElementById('btn-cap-p1').addEventListener('click', () => {
+  document.getElementById('btn-cap-p1').addEventListener('click', ()=>{
     ensureAudio();
-    if (!camPreview.videoWidth) { alert("Video belum siap. Tunggu 1 detik ya."); return; }
-    const url = captureSquareFromVideo(camPreview);
-    setPlayerPhoto('p1', url);
-    playTone(1400, 0.06, "triangle", 0.08);
+    if(!camPreview.videoWidth){ alert("Video belum siap. Tunggu 1 detik ya."); return; }
+    setPlayerPhoto('p1', captureSquareFromVideo(camPreview));
+    playTone(1400,0.06,"triangle",0.08);
   });
-  document.getElementById('btn-cap-p2').addEventListener('click', () => {
+  document.getElementById('btn-cap-p2').addEventListener('click', ()=>{
     ensureAudio();
-    if (!camPreview.videoWidth) { alert("Video belum siap. Tunggu 1 detik ya."); return; }
-    const url = captureSquareFromVideo(camPreview);
-    setPlayerPhoto('p2', url);
-    playTone(1400, 0.06, "triangle", 0.08);
+    if(!camPreview.videoWidth){ alert("Video belum siap. Tunggu 1 detik ya."); return; }
+    setPlayerPhoto('p2', captureSquareFromVideo(camPreview));
+    playTone(1400,0.06,"triangle",0.08);
   });
 
-  // start mediapipe camera immediately (so loading disappears fast)
-  camera.start().catch(err => {
+  // Start camera
+  camera.start().catch(err=>{
     console.error(err);
-    loadingEl.style.display = 'none';
+    loadingEl.style.display='none';
     alert("Kamera tidak bisa dibuka. Pastikan izin kamera, dan jalankan via localhost/HTTPS.");
   });
 
