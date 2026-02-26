@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Magic Lebaran Card ✨</title>
+    
+    <!-- MENGGANTI FONT: Quicksand untuk teks AR (lebih estetik & ramah), Plus Jakarta untuk UI -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Quicksand:wght@600;700&display=swap');
+        
+        :root { --primary: #10b981; --dark: #0f172a; --accent: #FF813F; }
+        
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: white; font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; touch-action: none; }
+        
+        /* LAYOUT KAMERA */
+        #app-container { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        video { position: absolute; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 10; pointer-events: none; }
+        
+        /* LANDING PAGE */
+        #landing-page {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(6,78,59,0.95) 0%, rgba(0,0,0,0.95) 100%);
+            backdrop-filter: blur(10px); z-index: 999; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box;
+        }
+        
+        .hero-icon { font-size: 4rem; margin-bottom: 10px; animation: float 3s ease-in-out infinite; }
+        h1 { font-size: 2.2rem; margin-bottom: 10px; background: linear-gradient(to right, #4ade80, #38bdf8); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        p.subtitle { color: #cbd5e1; font-size: 0.95rem; max-width: 300px; line-height: 1.5; margin-bottom: 30px; }
+        
+        .cta-btn {
+            background: var(--primary); color: #000; padding: 16px 40px; border-radius: 50px; font-weight: 800; font-size: 1.1rem; border: none; cursor: pointer;
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4); transition: all 0.2s; font-family: inherit;
+        }
+        .cta-btn:active { transform: scale(0.95); box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4); }
+
+        /* LOADING & COUNTDOWN */
+        #loading-screen, #countdown-screen {
+            position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index: 998;
+            display: none; flex-direction: column; justify-content: center; align-items: center; color: white;
+        }
+        .spinner { width: 50px; height: 50px; border: 5px solid rgba(16,185,129,0.3); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;}
+        #countdown-text { font-size: 6rem; font-weight: 800; color: var(--primary); text-shadow: 0 0 20px rgba(16,185,129,0.8); }
+
+        /* UI CONTROL BOTTOM SHEET */
+        #ui-layer {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            border-top: 1px solid rgba(255,255,255,0.1); padding: 25px 20px; box-sizing: border-box;
+            z-index: 100; transform: translateY(120%); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-radius: 30px 30px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+        }
+        #ui-layer.active { transform: translateY(0); }
+
+        /* Input Styling */
+        label { font-size: 0.75rem; color: #94a3b8; display: block; margin-top: 15px; margin-bottom: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+        select, input, textarea {
+            width: 100%; padding: 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: white; border-radius: 12px; font-family: inherit; box-sizing: border-box; font-size: 1rem; outline: none;
+        }
+
+        /* CAMERA CONTROLS (Floating) */
+        .camera-controls { 
+            position: absolute; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 90; align-items: center; transition: opacity 0.3s, transform 0.3s;
+        }
+        
+        .capture-btn {
+            width: 70px; height: 70px; border-radius: 50%; background: transparent; border: 4px solid white; display: flex; justify-content: center; align-items: center; cursor: pointer; position: relative;
+        }
+        .capture-btn .inner { width: 54px; height: 54px; background: white; border-radius: 50%; transition: all 0.2s; }
+        .capture-btn:active .inner { transform: scale(0.9); background: var(--primary); }
+        .timer-badge { position: absolute; top: -5px; right: -10px; background: var(--primary); color: black; font-weight: bold; font-size: 0.7rem; padding: 4px 8px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+
+        .icon-btn { width: 50px; height: 50px; border-radius: 50%; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2); color: white; font-size: 1.2rem; cursor: pointer; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        .icon-text { font-size: 0.55rem; margin-top: 2px; font-family: sans-serif; font-weight: bold;}
+
+        /* MODALS */
+        #flash-effect { position: absolute; top:0; left:0; width:100%; height:100%; background:white; z-index:1000; opacity:0; pointer-events:none; }
+        .flash-active { animation: flashAnim 0.5s ease-out; }
+
+        .modal {
+            position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1001;
+            display: none; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; backdrop-filter: blur(5px);
+        }
+        .modal-content { background: #1e293b; padding: 30px 20px; border-radius: 20px; text-align: center; width: 100%; max-width: 320px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5);}
+        .modal-content h3 { margin: 0 0 10px 0; color: var(--primary); }
+        .modal-content p { font-size: 0.9rem; color: #cbd5e1; margin-bottom: 20px; line-height: 1.5; }
+        
+        .btn-saweria { background: var(--accent); color: white; padding: 12px 20px; border-radius: 10px; text-decoration: none; font-weight: bold; display: block; margin-bottom: 10px; }
+        .btn-close { background: transparent; color: #94a3b8; border: none; padding: 10px; cursor: pointer; font-size: 0.9rem; text-decoration: underline; font-family: inherit;}
+
+        /* HINT OVERLAY AWAL */
+        #hint-overlay {
+            position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.7); padding: 15px 20px; border-radius: 15px; text-align: center;
+            border: 1px solid var(--primary); z-index: 80; pointer-events: none; transition: opacity 0.5s; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        /* Animasi */
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes flashAnim { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+        /* FIX UNTUK MENU DROPDOWN (SELECT OPTION) */
+        select option {
+            background-color: #1e293b; /* Warna latar belakang gelap (Navy/Slate) */
+            color: #ffffff; /* Warna teks putih */
+            font-size: 1rem;
+            padding: 10px;
+        }
+
+        /* Memperbaiki warna teks di beberapa browser mobile saat diklik */
+        select:focus {
+            background-color: #1e293b;
+}
+
+    </style>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="landing-page">
+        <div class="hero-icon">✨👐</div>
+        <h1>Lebaran AR Filter</h1>
+        <p class="subtitle">Bikin ucapan Idul Fitri estetik pakai gerakan tangan. Cocok buat story IG/TikTok!</p>
+        <button class="cta-btn" onclick="startApp()">MULAI BUAT</button>
+    </div>
+
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <h3 style="margin:0;">Memuat AI...</h3>
+        <p style="font-size: 0.8rem; color: #94a3b8;">Tunggu sebentar ya</p>
+    </div>
+
+    <div id="countdown-screen">
+        <div id="countdown-text">3</div>
+    </div>
+
+    <video id="input_video" playsinline autoplay muted></video>
+    <canvas id="output_canvas"></canvas>
+    <div id="flash-effect"></div>
+    
+    <div id="hint-overlay" style="display: none;">
+        <span style="font-size: 2rem;">👐</span>
+        <p style="margin: 5px 0 0 0; font-size: 0.85rem; font-weight: bold; color: white;">Rentangkan 2 tangan<br>untuk memunculkan teks</p>
+    </div>
+    
+    <!-- Camera Controls -->
+    <div class="camera-controls" id="camera-ui" style="display:none;">
+        <button class="icon-btn" onclick="toggleCleanMode()">
+            🎥<span class="icon-text">Rekam</span>
+        </button>
+        
+        <div class="capture-btn" onclick="startTimerCapture()">
+            <div class="inner"></div>
+            <div class="timer-badge">3s</div>
+        </div>
+        
+        <button class="icon-btn" onclick="toggleMenu()">
+            ⚙️<span class="icon-text">Edit</span>
+        </button>
+    </div>
+
+    <!-- Bottom Sheet Settings -->
+    <div id="ui-layer">
+        <div style="width: 40px; height: 5px; background: rgba(255,255,255,0.3); border-radius: 5px; margin: 0 auto 10px auto;"></div>
+        
+        <label>✨ Teks Ucapan</label>
+        <select id="presetSelect" onchange="checkCustom()">
+            <option value="Selamat Hari Raya Idul Fitri 1446 H. Mohon Maaf Lahir & Batin 🙏">Default (Lengkap)</option>
+            <option value="Taqabbalallahu Minna Wa Minkum. Selamat Lebaran! ✨">Islami</option>
+            <option value="Semoga puasanya full dan THR-nya cair deras! 💸">Lucu (Minta THR)</option>
+            <option value="custom">-- Tulis Sendiri --</option>
+        </select>
+        <textarea id="customText" rows="3" style="display:none; margin-top:5px;" placeholder="Ketik ucapan estetikmu di sini..."></textarea>
+        
+        <label>👤 Dari (Nama Kamu)</label>
+        <input type="text" id="senderName" placeholder="Contoh: Keluarga Budi">
+        
+        <button class="cta-btn" style="width: 100%; margin-top: 20px;" onclick="toggleMenu()">Terapkan & Tutup</button>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal" id="donation-modal">
+        <div class="modal-content">
+            <h3>📸 Berhasil Disimpan!</h3>
+            <p>Fotonya udah ada di galeri HP kamu. Langsung post ke Story biar makin kece!</p>
+            <p style="font-size: 0.8rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">Kalo kamu suka karya ini, traktir kreatornya kopi yuk! 👇</p>
+            <a href="https://saweria.co/USERNAME_SAWERIA_KAMU" target="_blank" class="btn-saweria">☕ Traktir Kopi di Saweria</a>
+            <button class="btn-close" onclick="closeModal('donation-modal')">Tutup</button>
+        </div>
+    </div>
+
+    <div class="modal" id="clean-mode-modal">
+        <div class="modal-content">
+            <h3>🎥 Mode Rekam Layar</h3>
+            <p>Semua tombol akan dihilangkan agar layarmu bersih. Silakan buka fitur <b>Screen Recorder</b> bawaan HP kamu untuk merekam video.</p>
+            <p style="font-size: 0.85rem; color: var(--primary); font-weight: bold;">Sentuh layar di mana saja untuk memunculkan tombol kembali.</p>
+            <button class="cta-btn" style="width:100%; padding: 12px; margin-top: 10px;" onclick="activateCleanMode()">Sembunyikan Tombol</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const uiLayer = document.getElementById('ui-layer');
+    const cameraUI = document.getElementById('camera-ui');
+    
+    let finalMessage = "";
+    let isAppRunning = false;
+    let camera;
+    let isCleanMode = false;
+
+    // --- DOM LOGIC ---
+    function checkCustom() {
+        const val = document.getElementById('presetSelect').value;
+        document.getElementById('customText').style.display = (val === 'custom') ? 'block' : 'none';
+    }
+
+    function toggleMenu() { uiLayer.classList.toggle('active'); }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function updateMessage() {
+        const preset = document.getElementById('presetSelect').value;
+        const custom = document.getElementById('customText').value;
+        const name = document.getElementById('senderName').value;
+        let msg = (preset === 'custom') ? custom : preset;
+        if(name) msg += `\n\n~ ${name}`;
+        finalMessage = msg || "Rentangkan jarimu...";
+    }
+
+    // --- PERBAIKAN LOGIKA LAYAR BERSIH (FIX BUG KLIK) ---
+    function toggleCleanMode() {
+        document.getElementById('clean-mode-modal').style.display = 'flex';
+    }
+
+    function activateCleanMode() {
+        closeModal('clean-mode-modal');
+        uiLayer.classList.remove('active'); // Pastikan menu edit tertutup
+        
+        // Buat transisi halus menghilang
+        cameraUI.style.opacity = '0';
+        cameraUI.style.transform = 'translateY(20px)';
+        cameraUI.style.pointerEvents = 'none';
+        isCleanMode = true;
+        
+        // Jeda 100ms sebelum pasang deteksi klik layar (menghindari bentrok/bubbling)
+        setTimeout(() => {
+            document.body.addEventListener('click', restoreUI);
+        }, 100);
+    }
+
+    function restoreUI() {
+        if(isCleanMode) {
+            cameraUI.style.opacity = '1';
+            cameraUI.style.transform = 'translateY(0)';
+            cameraUI.style.pointerEvents = 'auto';
+            isCleanMode = false;
+            
+            // Hapus deteksi klik setelah tombol muncul
+            document.body.removeEventListener('click', restoreUI);
+        }
+    }
+
+    // --- FUNGSI MENGHITUNG TINGGI TEKS ---
+    function getLines(ctx, text, maxWidth) {
+        let lines = [];
+        const paragraphs = text.split('\n');
+        
+        for (let i = 0; i < paragraphs.length; i++) {
+            let words = paragraphs[i].split(' ');
+            let currentLine = words[0];
+
+            for (let j = 1; j < words.length; j++) {
+                let word = words[j];
+                let width = ctx.measureText(currentLine + " " + word).width;
+                if (width < maxWidth) {
+                    currentLine += " " + word;
+                } else {
+                    lines.push(currentLine);
+                    currentLine = word;
+                }
+            }
+            lines.push(currentLine);
+        }
+        return lines;
+    }
+
+    // --- RENDER VISUAL (DENGAN FONT BARU) ---
+    function onResults(results) {
+        if (!isAppRunning) {
+            document.getElementById('loading-screen').style.display = 'none';
+            cameraUI.style.display = 'flex';
+            
+            const hint = document.getElementById('hint-overlay');
+            hint.style.display = 'block';
+            setTimeout(() => { hint.style.opacity = '0'; }, 4000); 
+            
+            toggleMenu(); 
+            isAppRunning = true;
+        }
+
+        const rect = videoElement.getBoundingClientRect();
+        canvasElement.width = rect.width;
+        canvasElement.height = rect.height;
+        
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length >= 2) {
+            updateMessage();
+            
+            const hand1 = results.multiHandLandmarks[0][8];
+            const hand2 = results.multiHandLandmarks[1][8];
+            const w = canvasElement.width;
+            const h = canvasElement.height;
+
+            const x1 = w - (hand1.x * w);
+            const y1 = hand1.y * h;
+            const x2 = w - (hand2.x * w);
+            const y2 = hand2.y * h;
+
+// 1. PERBAIKAN JARAK JARI (Dibuat overlap/menempel dengan jari)
+            // Dikurangi/ditambah 15px agar kotaknya seolah benar-benar "dipegang"
+            const left = Math.min(x1, x2) - 15; 
+            const right = Math.max(x1, x2) + 15; 
+            
+            const centerY = (y1 + y2) / 2;
+            const boxW = Math.max(right - left, 120);
+
+            if (boxW > 80) {
+                // 2. PERBAIKAN UKURAN FONT (Dibuat lebih kecil & proporsional)
+                // Angka pembagi dibesarkan (18) agar teks mengecil, batas maksimal diturunkan jadi 20px
+                const fontSize = Math.max(12, Math.min(boxW / 18, 20));
+                canvasCtx.font = `bold ${fontSize}px 'Quicksand', sans-serif`;
+                
+                // 3. PERBAIKAN JARAK TEKS KE UJUNG KOTAK (Padding dikecilkan)
+                const padding = 12; // Sebelumnya 25, dikecilkan agar teks lebih mepet ke jari
+                const maxWidth = boxW - (padding * 2);
+                const lines = getLines(canvasCtx, finalMessage, maxWidth);
+                
+                const lineHeight = fontSize * 1.4; 
+                const totalTextHeight = lines.length * lineHeight;
+                
+                const boxH = totalTextHeight + (padding * 2);
+                const top = centerY - (boxH / 2);
+
+                // Kotak Hologram 
+                canvasCtx.fillStyle = "rgba(15, 23, 42, 0.65)";
+                canvasCtx.shadowColor = "rgba(16, 185, 129, 0.6)";
+                canvasCtx.shadowBlur = 15; // Glow dikurangi sedikit agar lebih tajam
+                canvasCtx.beginPath();
+                canvasCtx.roundRect(left, top, boxW, boxH, 15); 
+                canvasCtx.fill();
+
+                canvasCtx.strokeStyle = "rgba(74, 222, 128, 0.8)";
+                canvasCtx.lineWidth = 2;
+                canvasCtx.stroke();
+                
+                canvasCtx.shadowBlur = 0; 
+
+                // Menulis Teks
+                canvasCtx.fillStyle = "white";
+                canvasCtx.textAlign = "center";
+                canvasCtx.textBaseline = "top";
+                
+                const centerX = left + (boxW / 2);
+                let currentY = top + padding;
+
+                for (let i = 0; i < lines.length; i++) {
+                    canvasCtx.fillText(lines[i], centerX, currentY);
+                    currentY += lineHeight;
+                }
+            }
+        }
+        canvasCtx.restore();
+    }
+
+    const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+    hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+    hands.onResults(onResults);
+
+    function startApp() {
+        document.getElementById('landing-page').style.display = 'none';
+        document.getElementById('loading-screen').style.display = 'flex';
+
+        camera = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            facingMode: "user"
+        });
+        camera.start().catch(err => {
+            alert("Gagal membuka kamera. Pastikan browser kamu mengizinkan akses kamera.");
+            location.reload();
+        });
+    }
+
+    // --- TIMER 3 DETIK ---
+    function startTimerCapture() {
+        uiLayer.classList.remove('active');
+        cameraUI.style.opacity = '0';
+        cameraUI.style.pointerEvents = 'none';
+        
+        const countdownScreen = document.getElementById('countdown-screen');
+        const countdownText = document.getElementById('countdown-text');
+        countdownScreen.style.display = 'flex';
+        
+        let timeLeft = 3;
+        countdownText.innerText = timeLeft;
+
+        const timer = setInterval(() => {
+            timeLeft--;
+            if (timeLeft > 0) {
+                countdownText.innerText = timeLeft;
+            } else {
+                clearInterval(timer);
+                countdownScreen.style.display = 'none';
+                takeScreenshot(); 
+            }
+        }, 1000);
+    }
+
+    function takeScreenshot() {
+        const flash = document.getElementById('flash-effect');
+        flash.classList.add('flash-active');
+        setTimeout(() => flash.classList.remove('flash-active'), 500);
+
+        setTimeout(() => {
+            const tempCanvas = document.createElement('canvas');
+            const w = canvasElement.width;
+            const h = canvasElement.height;
+            tempCanvas.width = w;
+            tempCanvas.height = h;
+            const ctx = tempCanvas.getContext('2d');
+            
+            ctx.save();
+            ctx.translate(w, 0);
+            ctx.scale(-1, 1);
+            
+            const videoRatio = videoElement.videoWidth / videoElement.videoHeight;
+            const canvasRatio = w / h;
+            let drawW, drawH, drawX, drawY;
+
+            if (canvasRatio > videoRatio) {
+                drawW = w; drawH = w / videoRatio;
+                drawX = 0; drawY = (h - drawH) / 2;
+            } else {
+                drawW = h * videoRatio; drawH = h;
+                drawX = (w - drawW) / 2; drawY = 0;
+            }
+            ctx.drawImage(videoElement, drawX, drawY, drawW, drawH);
+            ctx.restore();
+            
+            ctx.drawImage(canvasElement, 0, 0);
+            
+            // WATERMARK
+            ctx.fillStyle = "rgba(0,0,0,0.6)";
+            ctx.beginPath(); ctx.roundRect(10, h - 35, 180, 25, 8); ctx.fill();
+            ctx.font = "bold 12px 'Plus Jakarta Sans', sans-serif";
+            ctx.fillStyle = "white"; ctx.textAlign = "left";
+            ctx.fillText("✨ Bikin di: linkkamu.com", 15, h - 18);
+            
+            const link = document.createElement('a');
+            link.download = 'Lebaran-Estetik-' + Math.floor(Date.now() / 1000) + '.png';
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
+            
+            // Kembalikan tombol UI
+            cameraUI.style.opacity = '1';
+            cameraUI.style.pointerEvents = 'auto';
+            setTimeout(() => { document.getElementById('donation-modal').style.display = 'flex'; }, 1000);
+
+        }, 100);
+    }
+</script>
+
+</body>
+</html>
