@@ -307,6 +307,9 @@
             isAppRunning = true;
         }
 
+        // Pastikan video sudah terbaca resolusinya
+        if (!videoElement.videoWidth) return;
+
         const rect = videoElement.getBoundingClientRect();
         canvasElement.width = rect.width;
         canvasElement.height = rect.height;
@@ -317,32 +320,44 @@
         if (results.multiHandLandmarks && results.multiHandLandmarks.length >= 2) {
             updateMessage();
             
-            const hand1 = results.multiHandLandmarks[0][8];
-            const hand2 = results.multiHandLandmarks[1][8];
-            const w = canvasElement.width;
-            const h = canvasElement.height;
+            const hand1 = results.multiHandLandmarks[0][8]; // Ujung telunjuk 1
+            const hand2 = results.multiHandLandmarks[1][8]; // Ujung telunjuk 2
+            
+            // --- 🔴 PERBAIKAN MATEMATIKA KOORDINAT (FIX KOTAK MELAYANG) ---
+            const videoRatio = videoElement.videoWidth / videoElement.videoHeight;
+            const canvasRatio = canvasElement.width / canvasElement.height;
 
-            const x1 = w - (hand1.x * w);
-            const y1 = hand1.y * h;
-            const x2 = w - (hand2.x * w);
-            const y2 = hand2.y * h;
+            let drawW, drawH, offsetX = 0, offsetY = 0;
 
-// 1. PERBAIKAN JARAK JARI (Dibuat overlap/menempel dengan jari)
-            // Dikurangi/ditambah 15px agar kotaknya seolah benar-benar "dipegang"
-            const left = Math.min(x1, x2) - 15; 
-            const right = Math.max(x1, x2) + 15; 
+            // Hitung ukuran asli video yang terpotong (Crop) di layar HP
+            if (canvasRatio > videoRatio) {
+                drawW = canvasElement.width;
+                drawH = canvasElement.width / videoRatio;
+                offsetY = (canvasElement.height - drawH) / 2;
+            } else {
+                drawH = canvasElement.height;
+                drawW = canvasElement.height * videoRatio;
+                offsetX = (canvasElement.width - drawW) / 2;
+            }
+
+            // Sinkronkan titik jari AI dengan layar HP yang sudah di-Mirror
+            const x1 = canvasElement.width - ((hand1.x * drawW) + offsetX);
+            const y1 = (hand1.y * drawH) + offsetY;
+            const x2 = canvasElement.width - ((hand2.x * drawW) + offsetX);
+            const y2 = (hand2.y * drawH) + offsetY;
+            // --------------------------------------------------------------
+
+            const left = Math.min(x1, x2) - 15; // Menempel di jari
+            const right = Math.max(x1, x2) + 15; // Menempel di jari
             
             const centerY = (y1 + y2) / 2;
             const boxW = Math.max(right - left, 120);
 
             if (boxW > 80) {
-                // 2. PERBAIKAN UKURAN FONT (Dibuat lebih kecil & proporsional)
-                // Angka pembagi dibesarkan (18) agar teks mengecil, batas maksimal diturunkan jadi 20px
-                const fontSize = Math.max(12, Math.min(boxW / 18, 20));
+                const fontSize = Math.max(12, Math.min(boxW / 18, 20)); // Font rapi
                 canvasCtx.font = `bold ${fontSize}px 'Quicksand', sans-serif`;
                 
-                // 3. PERBAIKAN JARAK TEKS KE UJUNG KOTAK (Padding dikecilkan)
-                const padding = 12; // Sebelumnya 25, dikecilkan agar teks lebih mepet ke jari
+                const padding = 15;
                 const maxWidth = boxW - (padding * 2);
                 const lines = getLines(canvasCtx, finalMessage, maxWidth);
                 
@@ -355,7 +370,7 @@
                 // Kotak Hologram 
                 canvasCtx.fillStyle = "rgba(15, 23, 42, 0.65)";
                 canvasCtx.shadowColor = "rgba(16, 185, 129, 0.6)";
-                canvasCtx.shadowBlur = 15; // Glow dikurangi sedikit agar lebih tajam
+                canvasCtx.shadowBlur = 15;
                 canvasCtx.beginPath();
                 canvasCtx.roundRect(left, top, boxW, boxH, 15); 
                 canvasCtx.fill();
@@ -382,6 +397,7 @@
         }
         canvasCtx.restore();
     }
+
 
     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
     hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
